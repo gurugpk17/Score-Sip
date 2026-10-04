@@ -1,0 +1,6 @@
+{
+  "name": "Rummy 7’s — Game Night Scorekeeper",
+  "description": "Tactile card game night scorekeeper for 7s Rummy, 5s Rummy, ACE, and Custom Rummy with live standings, tea duty penalty tracking, and statistics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
