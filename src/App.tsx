@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useSessionStore } from './features/session/sessionStore';
 import { Header } from './components/layout/Header';
 import { BottomNav } from './components/layout/BottomNav';
@@ -16,7 +16,11 @@ import { DeleteSnapModal } from './components/modals/DeleteSnapModal';
 import { AddPhotoModal } from './components/modals/AddPhotoModal';
 
 export default function App() {
-  const { currentScreen, setScreen, activeSession } = useSessionStore();
+  const { currentScreen, setScreen, activeSession, initializePersistence } = useSessionStore();
+
+  useEffect(() => {
+    initializePersistence();
+  }, [initializePersistence]);
 
   const getHeaderProps = () => {
     switch (currentScreen) {

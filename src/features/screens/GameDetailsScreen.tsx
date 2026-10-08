@@ -381,7 +381,7 @@ export const GameDetailsScreen: React.FC = () => {
           </div>
 
           <button
-            onClick={settleTeaDuty}
+            onClick={() => settleTeaDuty(session.id)}
             className={`px-3 py-1.5 rounded-full font-headline text-[10px] font-bold uppercase transition-all shrink-0 ${
               session.teaSettled
                 ? 'bg-[#10b981] text-[#003824]'

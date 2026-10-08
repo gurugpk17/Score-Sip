@@ -225,22 +225,23 @@ export const GameNightGalleryScreen: React.FC = () => {
                         )}
 
                         {/* Player Tag avatars */}
-                        <div className="flex items-center gap-1.5 mt-2">
-                          <div className="flex -space-x-1.5 overflow-hidden">
-                            <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#0f131c] bg-[#4edea3] text-[#003824] font-headline text-[10px] font-bold flex items-center justify-center">
-                              G
+                        {featuredPhoto.playerInitials && featuredPhoto.playerInitials.length > 0 && (
+                          <div className="flex items-center gap-1.5 mt-2">
+                            <div className="flex -space-x-1.5 overflow-hidden">
+                              {featuredPhoto.playerInitials.map((init, i) => (
+                                <div
+                                  key={i}
+                                  className="inline-block h-6 w-6 rounded-full ring-2 ring-[#0f131c] bg-[#262a33] text-[#4edea3] font-headline text-[10px] font-bold flex items-center justify-center border border-[#4edea3]/30"
+                                >
+                                  {init}
+                                </div>
+                              ))}
                             </div>
-                            <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#0f131c] bg-[#ffb95f] text-[#2a1700] font-headline text-[10px] font-bold flex items-center justify-center">
-                              A
-                            </div>
-                            <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#0f131c] bg-[#ff7a73] text-[#410004] font-headline text-[10px] font-bold flex items-center justify-center">
-                              S
-                            </div>
+                            <span className="font-body text-[11px] text-[#bbcabf]">
+                              Tagged: {featuredPhoto.playerInitials.join(', ')}
+                            </span>
                           </div>
-                          <span className="font-body text-[11px] text-[#bbcabf]">
-                            Guru, Arun, Suresh
-                          </span>
-                        </div>
+                        )}
                       </div>
                     </div>
                   </div>

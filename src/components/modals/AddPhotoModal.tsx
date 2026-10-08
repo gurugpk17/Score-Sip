@@ -31,6 +31,16 @@ export const AddPhotoModal: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith('image/')) {
+      useSessionStore.getState().showToast('Please select a valid image file (JPEG, PNG, WebP).');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      useSessionStore.getState().showToast('Photo is too large (max 10MB allowed).');
+      return;
+    }
+
     try {
       setIsProcessing(true);
       triggerHaptic('light');

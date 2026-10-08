@@ -8,6 +8,7 @@ import {
   updatePlayerStatistics
 } from '../../domain/scoring/engine';
 import { StorageService } from '../../lib/storage/db';
+import { persistenceRepository } from '../../lib/repositories/persistenceRepository';
 import { triggerHaptic } from '../../lib/utils/haptics';
 
 export type ScreenView = 'dashboard' | 'setup' | 'live' | 'results' | 'ledger' | 'rankings' | 'gallery' | 'game-details';
@@ -60,7 +61,7 @@ interface SessionState {
   completeRound: () => void;
   finalizeSession: () => void;
   startRematch: () => void;
-  settleTeaDuty: () => void;
+  settleTeaDuty: (sessionId?: string) => void;
   viewSessionDetails: (sessionId: string) => void;
   viewGameDetails: (sessionId: string) => void;
 
@@ -76,6 +77,8 @@ interface SessionState {
   closeAddPhotoModal: () => void;
   
   // Settings & Utilities
+  isCloudConnected: boolean;
+  initializePersistence: () => Promise<void>;
   toggleHaptics: () => void;
   showToast: (msg: string) => void;
   clearToast: () => void;
@@ -116,6 +119,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     hapticsEnabled: true,
     toastMessage: null,
     viewingHistoricalSessionId: null,
+    isCloudConnected: persistenceRepository.isCloudConnected(),
 
     setScreen: (screen) => {
       triggerHaptic('selection');
@@ -472,24 +476,34 @@ export const useSessionStore = create<SessionState>((set, get) => {
       get().startNewSession();
     },
 
-    settleTeaDuty: () => {
-      const { activeSession, historySessions } = get();
-      if (!activeSession) return;
+    settleTeaDuty: (sessionId?: string) => {
+      const { activeSession, historySessions, viewingHistoricalSessionId, selectedGameDetailsId } = get();
+      const targetId = sessionId || selectedGameDetailsId || viewingHistoricalSessionId || activeSession?.id;
+      if (!targetId) return;
 
-      const updatedSession: GameSession = {
-        ...activeSession,
-        teaSettled: !activeSession.teaSettled
-      };
+      const updatedHistory = historySessions.map(s => {
+        if (s.id === targetId) {
+          return { ...s, teaSettled: !s.teaSettled };
+        }
+        return s;
+      });
 
-      const updatedHistory = historySessions.map(s => s.id === updatedSession.id ? updatedSession : s);
       StorageService.saveSessions(updatedHistory);
+
+      const updatedActive = activeSession?.id === targetId
+        ? { ...activeSession, teaSettled: !activeSession.teaSettled }
+        : activeSession;
+
+      const targetSession = updatedHistory.find(s => s.id === targetId);
+      const isSettled = targetSession?.teaSettled ?? false;
+
       triggerHaptic('success');
       set({
-        activeSession: updatedSession,
+        activeSession: updatedActive,
         historySessions: updatedHistory
       });
 
-      get().showToast(updatedSession.teaSettled ? "Tea Duty Settled! ☕ Paid" : "Tea Duty Unsettled");
+      get().showToast(isSettled ? "Tea Duty Settled! ☕ Paid" : "Tea Duty Unsettled");
     },
 
     viewSessionDetails: (sessionId) => {
@@ -522,9 +536,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     addPhotoToSession: (sessionId, photoData) => {
       const { historySessions, activeSession } = get();
+      const photoId = `snap_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       const newPhoto: GamePhoto = {
         ...photoData,
-        id: `snap_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        id: photoId,
         sessionId,
         uploadedAt: new Date().toISOString(),
         likes: 0
@@ -548,10 +563,44 @@ export const useSessionStore = create<SessionState>((set, get) => {
         addPhotoModalSessionId: null
       });
       get().showToast("Game snap added to ledger! 📸");
+
+      // Asynchronously upload to Supabase storage if cloud is active
+      if (persistenceRepository.isCloudConnected()) {
+        persistenceRepository.photos
+          .uploadPhoto(sessionId, photoId, newPhoto.storagePath, newPhoto.thumbnailUrl)
+          .then(async (uploaded) => {
+            newPhoto.storagePath = uploaded.storagePath;
+            newPhoto.thumbnailUrl = uploaded.thumbnailUrl;
+            await persistenceRepository.photos.savePhotoMetadata(newPhoto);
+
+            // Update session state with cloud storage URLs
+            const patchHistory = get().historySessions.map(s => {
+              if (s.id !== sessionId) return s;
+              return {
+                ...s,
+                photos: (s.photos || []).map(p => (p.id === photoId ? newPhoto : p))
+              };
+            });
+            StorageService.saveSessions(patchHistory);
+            const patchActive = get().activeSession?.id === sessionId
+              ? {
+                  ...get().activeSession!,
+                  photos: (get().activeSession!.photos || []).map(p => (p.id === photoId ? newPhoto : p))
+                }
+              : get().activeSession;
+            set({ historySessions: patchHistory, activeSession: patchActive });
+          })
+          .catch(err => {
+            console.warn('[sessionStore] Cloud photo upload failed, keeping local copy', err);
+          });
+      }
     },
 
     deletePhotoFromSession: (sessionId, photoId) => {
       const { historySessions, activeSession } = get();
+      const targetSession = historySessions.find(s => s.id === sessionId) || activeSession;
+      const targetPhoto = targetSession?.photos?.find(p => p.id === photoId);
+
       const removePhoto = (session: GameSession): GameSession => {
         if (session.id !== sessionId) return session;
         return {
@@ -564,6 +613,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
       StorageService.saveSessions(updatedHistory);
 
       const updatedActive = activeSession?.id === sessionId ? removePhoto(activeSession) : activeSession;
+
+      persistenceRepository.photos.deletePhoto(sessionId, photoId, targetPhoto?.storagePath).catch(err => {
+        console.warn('[sessionStore] Cloud photo deletion failed', err);
+      });
 
       triggerHaptic('medium');
       set({
@@ -588,6 +641,10 @@ export const useSessionStore = create<SessionState>((set, get) => {
       StorageService.saveSessions(updatedHistory);
       const updatedActive = activeSession ? updateLike(activeSession) : null;
       triggerHaptic('light');
+
+      persistenceRepository.photos.toggleLike(photoId).catch(err => {
+        console.warn('[sessionStore] Cloud like update failed', err);
+      });
 
       set(state => ({
         historySessions: updatedHistory,
@@ -640,6 +697,30 @@ export const useSessionStore = create<SessionState>((set, get) => {
           set({ toastMessage: null });
         }
       }, 2400);
+    },
+
+    initializePersistence: async () => {
+      if (persistenceRepository.isCloudConnected()) {
+        try {
+          const { sessions, players, stats } = await StorageService.syncFromPersistence();
+          const currentActiveId = StorageService.getActiveSessionId();
+          const activeSession = currentActiveId
+            ? sessions.find(s => s.id === currentActiveId && s.status === 'active') || null
+            : null;
+
+          if (sessions.length > 0 || players.length > 0) {
+            set({
+              historySessions: sessions.length > 0 ? sessions : get().historySessions,
+              playersRoster: players.length > 0 ? players : get().playersRoster,
+              playerStats: Object.keys(stats).length > 0 ? stats : get().playerStats,
+              activeSession: activeSession ?? get().activeSession,
+              isCloudConnected: true
+            });
+          }
+        } catch (err) {
+          console.warn('[sessionStore] Failed to initialize from cloud persistence:', err);
+        }
+      }
     },
 
     clearToast: () => set({ toastMessage: null })

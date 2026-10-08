@@ -300,7 +300,7 @@ export const MatchResultsScreen: React.FC = () => {
 
             {/* Chai Settlement Action Button */}
             <button
-              onClick={settleTeaDuty}
+              onClick={() => settleTeaDuty(targetSession.id)}
               className={`w-full min-h-[48px] rounded-xl font-headline font-bold text-xs uppercase flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.97] cursor-pointer ${
                 targetSession.teaSettled
                   ? 'bg-[#10b981] text-[#003824]'
