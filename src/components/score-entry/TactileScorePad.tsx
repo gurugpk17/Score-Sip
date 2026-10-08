@@ -9,6 +9,7 @@ export const TactileScorePad: React.FC = () => {
     activeScoringPlayerId,
     baseScoreInput,
     activeScoreType,
+    setBaseScore,
     appendDigitToScore,
     backspaceScore,
     clearScore,
@@ -26,6 +27,7 @@ export const TactileScorePad: React.FC = () => {
   const multiplier = currentRound?.multiplier || 1;
   const fullPenaltyValue = activeSession.gameConfig.fullPenaltyValue || 80;
   const finalScore = calculateRoundScore(baseScoreInput, multiplier);
+  const isAce = activeSession.gameConfig.variant === 'ace';
 
   return (
     <div className="w-full rounded-2xl bg-[#262a33] border border-[#3c4a42]/60 shadow-2xl p-4 relative overflow-hidden">
@@ -59,7 +61,9 @@ export const TactileScorePad: React.FC = () => {
       <div className="w-full rounded-xl bg-[#0a0e16] p-3 mb-3 border border-[#1c2028] shadow-inner flex items-center justify-between">
         <div className="flex items-baseline gap-2">
           <div className="flex flex-col">
-            <span className="font-headline text-[10px] uppercase tracking-wider text-[#86948a]">BASE</span>
+            <span className="font-headline text-[10px] uppercase tracking-wider text-[#86948a]">
+              {isAce ? 'ACE SCORE' : 'BASE'}
+            </span>
             <span className="font-headline font-bold text-3xl text-[#dfe2ee] tabular-nums">
               {baseScoreInput}
             </span>
@@ -87,33 +91,71 @@ export const TactileScorePad: React.FC = () => {
       </div>
 
       {/* Quick Action Macro Buttons */}
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        {/* Flawless Round DICK (0) */}
-        <button
-          onClick={setDickScore}
-          className={`h-12 rounded-xl transition-all flex items-center justify-center gap-1.5 font-headline font-bold text-sm shadow-sm active:scale-95 cursor-pointer ${
-            activeScoreType === 'dick' && baseScoreInput === 0
-              ? 'bg-[#4edea3] text-[#003824] shadow-[0_0_12px_rgba(78,222,163,0.4)]'
-              : 'bg-[#4edea3]/15 text-[#4edea3] hover:bg-[#4edea3]/25'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[19px]">military_tech</span>
-          <span>DICK</span>
-        </button>
+      {isAce ? (
+        <div className="mb-3 flex flex-col gap-1.5 bg-[#181c24] p-2.5 rounded-xl border border-[#3c4a42]/50">
+          <div className="flex items-center justify-between">
+            <span className="font-headline text-[10px] uppercase font-bold tracking-wider text-[#4edea3] flex items-center gap-1">
+              <span className="material-symbols-outlined text-[13px]">military_tech</span>
+              ACE Finishing Position (Auto-Calculated)
+            </span>
+            <span className="font-headline text-[10px] text-[#bbcabf]">
+              (pos - 1) × 10
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {Array.from({ length: Math.max(activeSession.players.length, 5) }, (_, i) => {
+              const pos = i + 1;
+              const pts = (pos - 1) * 10;
+              const isSelected = baseScoreInput === pts;
+              const medal = pos === 1 ? '🥇 1st' : pos === 2 ? '🥈 2nd' : pos === 3 ? '🥉 3rd' : `${pos}th`;
+              return (
+                <button
+                  key={pos}
+                  type="button"
+                  onClick={() => setBaseScore(pts)}
+                  style={isSelected ? { backgroundColor: '#4edea3', color: '#003824' } : undefined}
+                  className={`h-11 rounded-lg font-headline font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#4edea3] text-[#003824] shadow-[0_0_12px_rgba(78,222,163,0.4)]'
+                      : 'bg-[#262a33] text-[#dfe2ee] hover:bg-[#353942] border border-[#3c4a42]/40'
+                  }`}
+                >
+                  <span>{medal}</span>
+                  <span className="text-[10px] font-normal opacity-85">{pts} PTS</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {/* Flawless Round DICK (0) */}
+          <button
+            onClick={setDickScore}
+            className={`h-12 rounded-xl transition-all flex items-center justify-center gap-1.5 font-headline font-bold text-sm shadow-sm active:scale-95 cursor-pointer ${
+              activeScoreType === 'dick' && baseScoreInput === 0
+                ? 'bg-[#4edea3] text-[#003824] shadow-[0_0_12px_rgba(78,222,163,0.4)]'
+                : 'bg-[#4edea3]/15 text-[#4edea3] hover:bg-[#4edea3]/25'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[19px]">military_tech</span>
+            <span>DICK</span>
+          </button>
 
-        {/* Maximum Penalty FULL */}
-        <button
-          onClick={setFullScore}
-          className={`h-12 rounded-xl transition-all flex items-center justify-center gap-1.5 font-headline font-bold text-sm shadow-sm active:scale-95 cursor-pointer ${
-            activeScoreType === 'full'
-              ? 'bg-[#93000a] text-[#ffdad6] shadow-[0_0_12px_rgba(255,180,171,0.3)]'
-              : 'bg-[#93000a]/30 text-[#ffb4ab] hover:bg-[#93000a]/40'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[19px]">warning</span>
-          <span>FULL</span>
-        </button>
-      </div>
+          {/* Maximum Penalty FULL */}
+          <button
+            onClick={setFullScore}
+            className={`h-12 rounded-xl transition-all flex items-center justify-center gap-1.5 font-headline font-bold text-sm shadow-sm active:scale-95 cursor-pointer ${
+              activeScoreType === 'full'
+                ? 'bg-[#93000a] text-[#ffdad6] shadow-[0_0_12px_rgba(255,180,171,0.3)]'
+                : 'bg-[#93000a]/30 text-[#ffb4ab] hover:bg-[#93000a]/40'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[19px]">warning</span>
+            <span>FULL</span>
+          </button>
+        </div>
+      )}
 
       {/* Tactile Numpad Grid */}
       <div className="grid grid-cols-3 gap-1.5 mb-3">

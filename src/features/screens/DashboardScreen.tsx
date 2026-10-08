@@ -70,7 +70,8 @@ export const DashboardScreen: React.FC = () => {
           {/* Dominant Neon CTA */}
           <button
             onClick={handleStartGame}
-            className="relative group w-full h-14 rounded-xl bg-[#4edea3] hover:bg-[#6ffbbe] text-[#003824] font-headline font-bold text-base uppercase tracking-wide flex items-center justify-center gap-2 active:scale-[0.97] transition-all duration-150 shadow-[0_8px_24px_rgba(78,222,163,0.35)] overflow-hidden cursor-pointer"
+            style={{ backgroundColor: '#4edea3', color: '#003824' }}
+            className="relative group w-full h-14 rounded-xl font-headline font-bold text-base uppercase tracking-wide flex items-center justify-center gap-2 active:scale-[0.97] transition-all duration-150 shadow-[0_8px_24px_rgba(78,222,163,0.35)] overflow-hidden cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4edea3]"
             id="btn-start-game"
           >
             <span className="material-symbols-outlined text-[24px]">add_circle</span>

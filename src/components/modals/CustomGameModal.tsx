@@ -74,22 +74,59 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
           </div>
 
           {/* Number of Rounds */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <div className="flex justify-between items-center">
               <label className="font-headline text-xs font-bold uppercase tracking-wider text-[#bbcabf]">
-                Total Rounds: {roundCount}
+                Total Rounds ({roundCount})
               </label>
-              <span className="font-headline text-xs text-[#4edea3]">{roundCount} Hands</span>
+              <span className="font-headline text-xs text-[#4edea3] font-bold">{roundCount} Hands</span>
             </div>
-            <div className="flex items-center gap-2">
-              {[3, 4, 5, 6, 7, 8, 10].map((count) => (
+
+            {/* Stepper with Direct Input */}
+            <div className="flex items-center gap-3 bg-[#0a0e16] p-2 rounded-xl border border-[#3c4a42]/40">
+              <button
+                type="button"
+                onClick={() => setRoundCount(Math.max(1, roundCount - 1))}
+                className="w-10 h-10 rounded-lg bg-[#262a33] hover:bg-[#353942] text-[#dfe2ee] font-headline text-xl font-bold flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+              >
+                -
+              </button>
+              <div className="flex-1 flex flex-col items-center">
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={roundCount}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) setRoundCount(Math.max(1, Math.min(50, val)));
+                  }}
+                  className="w-20 text-center font-headline font-bold text-2xl text-[#4edea3] bg-transparent focus:outline-none"
+                />
+                <span className="font-headline text-[10px] text-[#86948a] uppercase tracking-wider">
+                  Configured Rounds
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRoundCount(Math.min(50, roundCount + 1))}
+                className="w-10 h-10 rounded-lg bg-[#262a33] hover:bg-[#353942] text-[#dfe2ee] font-headline text-xl font-bold flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+              >
+                +
+              </button>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
+              {[3, 5, 7, 10, 12, 14, 15, 20, 25].map((count) => (
                 <button
                   key={count}
                   type="button"
                   onClick={() => setRoundCount(count)}
-                  className={`flex-1 h-9 rounded-lg font-headline text-xs font-bold transition-all ${
+                  style={roundCount === count ? { backgroundColor: '#4edea3', color: '#003824' } : undefined}
+                  className={`px-3 py-1.5 rounded-lg font-headline text-xs font-bold transition-all shrink-0 cursor-pointer ${
                     roundCount === count
-                      ? 'bg-[#4edea3] text-[#003824]'
+                      ? 'bg-[#4edea3] text-[#003824] shadow-sm'
                       : 'bg-[#262a33] text-[#bbcabf] hover:bg-[#353942]'
                   }`}
                 >

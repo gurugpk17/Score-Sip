@@ -5,8 +5,9 @@ dotenv.config({ quiet: true });
 // Ensure WebSocket constructor exists in Node.js runtime for Supabase client
 if (typeof globalThis.WebSocket === 'undefined') {
   try {
+    // @ts-ignore untyped dev dependency
     const ws = await import('ws');
-    // @ts-expect-error WebSocket polyfill for Node.js test environment
+    // @ts-ignore polyfill
     globalThis.WebSocket = ws.default || ws;
   } catch {
     // ws module not present

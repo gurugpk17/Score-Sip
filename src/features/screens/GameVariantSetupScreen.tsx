@@ -53,7 +53,7 @@ export const GameVariantSetupScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col w-full pb-32 max-w-md mx-auto">
+    <div className="flex flex-col w-full pb-48 max-w-md mx-auto">
       {/* Game Variant Deck */}
       <div className="relative w-full px-4 pt-3 overflow-hidden">
         <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-72 h-36 bg-[#4edea3]/10 rounded-full blur-3xl pointer-events-none" />
@@ -355,8 +355,8 @@ export const GameVariantSetupScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Floating Action Bar */}
-      <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto p-4 bg-[#0a0e16]/92 backdrop-blur-xl border-t border-[#3c4a42]/30 z-40">
+      {/* Bottom Floating Action Bar positioned above BottomNav dock */}
+      <div className="fixed bottom-16 inset-x-0 max-w-md mx-auto p-3 bg-[#0a0e16]/95 backdrop-blur-xl border-t border-[#3c4a42]/40 z-40 shadow-[0_-4px_24px_rgba(0,0,0,0.6)]">
         <div className="flex items-center justify-between mb-2 px-1">
           <span className="font-headline text-[11px] uppercase text-[#bbcabf] font-bold tracking-widest" id="summary-game-mode">
             {currentGame.name} • {currentGame.roundCount} ROUNDS
@@ -374,7 +374,8 @@ export const GameVariantSetupScreen: React.FC = () => {
 
         <button
           onClick={handleStart}
-          className="relative w-full h-14 rounded-xl bg-[#4edea3] hover:bg-[#6ffbbe] text-[#003824] font-headline font-bold text-base flex items-center justify-center gap-2 shadow-[0_4px_24px_rgba(78,222,163,0.35)] active:scale-[0.97] transition-all overflow-hidden group cursor-pointer"
+          style={{ backgroundColor: '#4edea3', color: '#003824' }}
+          className="relative w-full h-14 rounded-xl font-headline font-bold text-base flex items-center justify-center gap-2 shadow-[0_4px_24px_rgba(78,222,163,0.35)] active:scale-[0.97] transition-all overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4edea3]"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
           <span className="material-symbols-outlined text-[24px]">play_circle</span>
