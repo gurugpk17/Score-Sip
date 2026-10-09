@@ -13,6 +13,7 @@ export interface GameConfig {
 
 export interface Player {
   id: string;
+  userId?: string;
   name: string;
   seatNumber: number;
   isHost?: boolean;
@@ -52,6 +53,7 @@ export interface SessionResult {
 
 export interface PlayerStats {
   playerId: string;
+  userId?: string;
   playerName: string;
   sessionsPlayed: number;
   wins: number;
@@ -66,6 +68,7 @@ export interface PlayerStats {
 
 export interface GamePhoto {
   id: string;
+  userId?: string;
   sessionId: string;
   gameName: string;
   sessionName: string;
@@ -83,6 +86,7 @@ export interface GamePhoto {
 
 export interface GameSession {
   id: string;
+  userId?: string;
   name: string;
   gameConfig: GameConfig;
   status: 'draft' | 'active' | 'completed';

@@ -26,6 +26,7 @@ type GamePhotoInsert = Database['public']['Tables']['game_photos']['Insert'];
 export function mapPlayerDbToDomain(row: PlayerRow): Player {
   return {
     id: row.id,
+    userId: row.user_id || undefined,
     name: row.name,
     seatNumber: row.seat_number,
     isHost: row.is_host,
@@ -38,6 +39,7 @@ export function mapPlayerDbToDomain(row: PlayerRow): Player {
 export function mapPlayerDomainToDb(player: Player): PlayerInsert {
   return {
     id: player.id,
+    user_id: player.userId || null,
     name: player.name,
     seat_number: player.seatNumber,
     is_host: player.isHost ?? false,
@@ -54,6 +56,7 @@ export function mapStatsDbToDomain(row: PlayerStatsRow): PlayerStats {
 
   return {
     playerId: row.player_id,
+    userId: row.user_id || undefined,
     playerName: row.player_name,
     sessionsPlayed: row.sessions_played,
     wins: row.wins,
@@ -70,6 +73,7 @@ export function mapStatsDbToDomain(row: PlayerStatsRow): PlayerStats {
 export function mapStatsDomainToDb(stats: PlayerStats): PlayerStatsInsert {
   return {
     player_id: stats.playerId,
+    user_id: stats.userId || null,
     player_name: stats.playerName,
     sessions_played: stats.sessionsPlayed,
     wins: stats.wins,
@@ -86,6 +90,7 @@ export function mapStatsDomainToDb(stats: PlayerStats): PlayerStatsInsert {
 export function mapPhotoDbToDomain(row: GamePhotoRow): GamePhoto {
   return {
     id: row.id,
+    userId: row.user_id || undefined,
     sessionId: row.session_id,
     gameName: row.game_name,
     sessionName: row.session_name,
@@ -105,6 +110,7 @@ export function mapPhotoDbToDomain(row: GamePhotoRow): GamePhoto {
 export function mapPhotoDomainToDb(photo: GamePhoto): GamePhotoInsert {
   return {
     id: photo.id,
+    user_id: photo.userId || null,
     session_id: photo.sessionId,
     game_name: photo.gameName,
     session_name: photo.sessionName,
@@ -124,6 +130,7 @@ export function mapPhotoDomainToDb(photo: GamePhoto): GamePhotoInsert {
 export function mapSessionDomainToDb(session: GameSession): SessionInsert {
   return {
     id: session.id,
+    user_id: session.userId || null,
     name: session.name,
     status: session.status,
     game_config: session.gameConfig as unknown as Database['public']['Tables']['sessions']['Insert']['game_config'],
@@ -195,6 +202,7 @@ export function assembleSessionDomain(params: {
 
   return {
     id: sessionRow.id,
+    userId: sessionRow.user_id || undefined,
     name: sessionRow.name,
     gameConfig: sessionRow.game_config as unknown as GameConfig,
     status: sessionRow.status,

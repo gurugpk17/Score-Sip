@@ -52,8 +52,8 @@ export const MatchResultsScreen: React.FC = () => {
     triggerHaptic('medium');
     const winnerText = `👑 *${targetSession.name}* Final Scorecard:\n🏆 1st: ${winner.playerName} (${winner.totalScore} pts)`;
     const runnerText = runnerUp ? `\n🥈 2nd: ${runnerUp.playerName} (${runnerUp.totalScore} pts)` : '';
-    const teaText = `\n☕ Tea Duty: ${teaDutyPlayers.map(p => p.playerName).join(' & ')} (${mainTeaLoser.totalScore} pts) owes chais & samosas!`;
-    const fullText = `${winnerText}${runnerText}${teaText}\n\nRecorded on Rummy 7's Table Felt.`;
+    const teaText = `\n☕ Tea Duty: ${teaDutyPlayers.map(p => p.playerName).join(' & ')} (${mainTeaLoser.totalScore} pts) owes tea duty!`;
+    const fullText = `${winnerText}${runnerText}${teaText}\n\nRecorded on Score & Sip.`;
 
     if (navigator.share) {
       navigator.share({
@@ -286,16 +286,12 @@ export const MatchResultsScreen: React.FC = () => {
             {/* Verdict container */}
             <div className="bg-[#0a0e16]/80 rounded-xl p-3 flex flex-col gap-1 mb-3 border border-[#3c4a42]/30">
               <div className="flex items-center gap-1.5 text-[#ffb95f]">
-                <span className="material-symbols-outlined text-[17px]">payments</span>
-                <span className="font-headline text-xs font-bold">Your wallet has entered the chat 💸</span>
+                <span className="material-symbols-outlined text-[17px]">local_cafe</span>
+                <span className="font-headline text-xs font-bold">Tea Duty Assigned</span>
               </div>
               <p className="font-body text-xs text-[#bbcabf]">
-                <strong className="text-[#dfe2ee]">Table verdict:</strong> 5 Cutting Chais + 5 Hot Samosas on {mainTeaLoser.playerName} at Raju Tapri!
+                <strong className="text-[#dfe2ee]">Table verdict:</strong> {mainTeaLoser.playerName} owes tea duty for the table.
               </p>
-              <div className="flex items-center gap-1 text-[#86948a] text-[11px] italic mt-0.5">
-                <span className="material-symbols-outlined text-[13px]">history_edu</span>
-                <span>"No escape. The felt remembers."</span>
-              </div>
             </div>
 
             {/* Chai Settlement Action Button */}
@@ -459,8 +455,8 @@ export const MatchResultsScreen: React.FC = () => {
                 <SteamingTeaCup3D className="w-full h-56" />
 
                 <div className="absolute bottom-2 bg-[#0f131c]/90 backdrop-blur-sm border border-[#ffb95f]/30 px-3 py-1 rounded-full shadow-sm flex items-center gap-1.5 text-[#ffb95f]">
-                  <span className="material-symbols-outlined text-[16px] animate-pulse">local_fire_department</span>
-                  <span className="font-headline text-[11px] font-bold">Hot Cutting Chai On Deck</span>
+                  <span className="material-symbols-outlined text-[16px] animate-pulse">local_cafe</span>
+                  <span className="font-headline text-[11px] font-bold">Tea Duty Active</span>
                 </div>
               </div>
 
@@ -507,68 +503,26 @@ export const MatchResultsScreen: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Order Bill Estimate Tab */}
-                <div className="mt-3 bg-[#1c2028] border border-[#3c4a42]/30 rounded-xl p-3">
-                  <div className="flex justify-between items-center text-[#86948a] font-headline text-[10px] uppercase font-bold mb-1">
-                    <span>Room Order Tab</span>
-                    <span>Est. ₹190</span>
+                {/* Session Outcome Details */}
+                <div className="mt-3 bg-[#1c2028] border border-[#3c4a42]/30 rounded-xl p-3 flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-[#86948a] font-headline text-[10px] uppercase font-bold">
+                    <span>Tournament Summary</span>
+                    <span>{targetSession.gameConfig.name}</span>
                   </div>
                   <div className="flex justify-between items-center text-[#dfe2ee] font-body text-xs">
                     <span className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[16px] text-[#ffb95f]">coffee</span>
-                      5 × Masala Cutting Chais
+                      <span className="material-symbols-outlined text-[16px] text-[#4edea3]">military_tech</span>
+                      Winner: {winner.playerName}
                     </span>
-                    <span className="font-headline font-bold text-xs">₹100</span>
+                    <span className="font-headline font-bold text-xs text-[#4edea3]">{winner.totalScore} pts</span>
                   </div>
-                  <div className="flex justify-between items-center text-[#dfe2ee] font-body text-xs mt-1.5">
+                  <div className="flex justify-between items-center text-[#dfe2ee] font-body text-xs">
                     <span className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[16px] text-[#ffb95f]">bakery_dining</span>
-                      1 × Osmania Biscuit Plate & Samosas
+                      <span className="material-symbols-outlined text-[16px] text-[#ff7a73]">local_cafe</span>
+                      Tea Duty: {mainTeaLoser.playerName}
                     </span>
-                    <span className="font-headline font-bold text-xs">₹90</span>
+                    <span className="font-headline font-bold text-xs text-[#ff7a73]">{mainTeaLoser.totalScore} pts</span>
                   </div>
-                </div>
-
-                {/* Humorous Penalty Checklist */}
-                <div className="mt-3 space-y-2">
-                  <div className="font-headline text-[10px] uppercase font-bold tracking-wider text-[#86948a]">
-                    Penalty Protocol Status
-                  </div>
-
-                  <label className="flex items-center gap-2.5 bg-[#0a0e16] p-2.5 rounded-xl border border-[#3c4a42]/30">
-                    <input type="checkbox" checked disabled className="accent-[#4edea3] w-4 h-4 rounded" />
-                    <span className="font-body text-xs text-[#bbcabf] line-through">
-                      Corner tea stall guy pinged
-                    </span>
-                    <span className="material-symbols-outlined text-[#4edea3] text-[16px] ml-auto">check_circle</span>
-                  </label>
-
-                  <label className="flex items-center gap-2.5 bg-[#0a0e16] p-2.5 rounded-xl border border-[#3c4a42]/30">
-                    <input type="checkbox" checked disabled className="accent-[#4edea3] w-4 h-4 rounded" />
-                    <span className="font-body text-xs text-[#bbcabf] line-through">
-                      Warm bun maska added by Kumar
-                    </span>
-                    <span className="material-symbols-outlined text-[#4edea3] text-[16px] ml-auto">check_circle</span>
-                  </label>
-
-                  <label
-                    onClick={() => {
-                      triggerHaptic('medium');
-                      setExcuseChecked(!excuseChecked);
-                    }}
-                    className="flex items-center gap-2.5 bg-[#0a0e16] p-2.5 rounded-xl border border-[#ffb95f]/30 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={excuseChecked}
-                      onChange={() => {}}
-                      className="accent-[#4edea3] w-4 h-4 rounded"
-                    />
-                    <span className="font-body text-xs text-[#dfe2ee]">
-                      Card luck excuses universally rejected
-                    </span>
-                    <span className="material-symbols-outlined text-[#ffb95f] text-[16px] ml-auto">gavel</span>
-                  </label>
                 </div>
               </div>
             </div>

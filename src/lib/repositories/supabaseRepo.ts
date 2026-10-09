@@ -30,11 +30,28 @@ import { updatePlayerStatistics } from '../../domain/scoring/engine';
 export class SupabasePlayerRepository implements IPlayerRepository {
   constructor(private client: SupabaseClient<Database>) {}
 
-  async getPlayers(): Promise<Player[]> {
-    const { data, error } = await this.client
+  private async getEffectiveUserId(userId?: string): Promise<string | undefined> {
+    if (userId) return userId;
+    try {
+      const { data } = await this.client.auth.getUser();
+      return data.user?.id;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async getPlayers(userId?: string): Promise<Player[]> {
+    const effectiveUserId = await this.getEffectiveUserId(userId);
+    let query = this.client
       .from('players')
       .select('*')
       .order('seat_number', { ascending: true });
+
+    if (effectiveUserId) {
+      query = query.eq('user_id', effectiveUserId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('[SupabasePlayerRepository] getPlayers error:', error);
@@ -44,10 +61,15 @@ export class SupabasePlayerRepository implements IPlayerRepository {
     return (data || []).map(mapPlayerDbToDomain);
   }
 
-  async savePlayers(players: Player[]): Promise<void> {
+  async savePlayers(players: Player[], userId?: string): Promise<void> {
     if (players.length === 0) return;
+    const effectiveUserId = await this.getEffectiveUserId(userId);
 
-    const inserts = players.map(mapPlayerDomainToDb);
+    const inserts = players.map(p => ({
+      ...mapPlayerDomainToDb(p),
+      user_id: p.userId || effectiveUserId || null
+    }));
+
     const { error } = await this.client.from('players').upsert(inserts, {
       onConflict: 'id'
     });
@@ -58,8 +80,13 @@ export class SupabasePlayerRepository implements IPlayerRepository {
     }
   }
 
-  async createPlayer(player: Player): Promise<Player> {
-    const insert = mapPlayerDomainToDb(player);
+  async createPlayer(player: Player, userId?: string): Promise<Player> {
+    const effectiveUserId = await this.getEffectiveUserId(userId);
+    const insert = {
+      ...mapPlayerDomainToDb(player),
+      user_id: player.userId || effectiveUserId || null
+    };
+
     const { error } = await this.client.from('players').upsert(insert, {
       onConflict: 'id'
     });
@@ -69,14 +96,21 @@ export class SupabasePlayerRepository implements IPlayerRepository {
       throw error;
     }
 
-    return player;
+    return { ...player, userId: effectiveUserId || player.userId };
   }
 
-  async deletePlayer(playerId: string): Promise<void> {
-    const { error } = await this.client
+  async deletePlayer(playerId: string, userId?: string): Promise<void> {
+    const effectiveUserId = await this.getEffectiveUserId(userId);
+    let query = this.client
       .from('players')
       .delete()
       .eq('id', playerId);
+
+    if (effectiveUserId) {
+      query = query.eq('user_id', effectiveUserId);
+    }
+
+    const { error } = await query;
 
     if (error) {
       console.error('[SupabasePlayerRepository] deletePlayer error:', error);
@@ -88,11 +122,28 @@ export class SupabasePlayerRepository implements IPlayerRepository {
 export class SupabaseSessionRepository implements ISessionRepository {
   constructor(private client: SupabaseClient<Database>) {}
 
-  async getSessions(): Promise<GameSession[]> {
-    const { data: sessionRows, error: sErr } = await this.client
+  private async getEffectiveUserId(userId?: string): Promise<string | undefined> {
+    if (userId) return userId;
+    try {
+      const { data } = await this.client.auth.getUser();
+      return data.user?.id;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async getSessions(userId?: string): Promise<GameSession[]> {
+    const effectiveUserId = await this.getEffectiveUserId(userId);
+    let query = this.client
       .from('sessions')
       .select('*')
       .order('started_at', { ascending: false });
+
+    if (effectiveUserId) {
+      query = query.eq('user_id', effectiveUserId);
+    }
+
+    const { data: sessionRows, error: sErr } = await query;
 
     if (sErr) {
       console.error('[SupabaseSessionRepository] getSessions error:', sErr);
@@ -136,6 +187,7 @@ export class SupabaseSessionRepository implements ISessionRepository {
         const master = playersMasterMap.get(sp.player_id);
         return {
           id: sp.player_id,
+          userId: master?.userId || (sRow.user_id || undefined),
           name: master?.name || sp.initials || 'Player',
           seatNumber: sp.seat_number,
           isHost: sp.is_host ?? false,
@@ -161,20 +213,29 @@ export class SupabaseSessionRepository implements ISessionRepository {
     });
   }
 
-  async getSessionById(id: string): Promise<GameSession | null> {
-    const sessions = await this.getSessions();
+  async getSessionById(id: string, userId?: string): Promise<GameSession | null> {
+    const sessions = await this.getSessions(userId);
     return sessions.find(s => s.id === id) || null;
   }
 
-  async saveSession(session: GameSession): Promise<void> {
+  async saveSession(session: GameSession, userId?: string): Promise<void> {
+    const effectiveUserId = await this.getEffectiveUserId(userId || session.userId);
+
     // 1. Ensure master players exist in players table
     if (session.players.length > 0) {
-      const playerInserts = session.players.map(mapPlayerDomainToDb);
+      const playerInserts = session.players.map(p => ({
+        ...mapPlayerDomainToDb(p),
+        user_id: p.userId || effectiveUserId || null
+      }));
       await this.client.from('players').upsert(playerInserts, { onConflict: 'id' });
     }
 
     // 2. Upsert session master row
-    const sessionInsert = mapSessionDomainToDb(session);
+    const sessionInsert = {
+      ...mapSessionDomainToDb(session),
+      user_id: effectiveUserId || null
+    };
+
     const { error: sErr } = await this.client.from('sessions').upsert(sessionInsert, {
       onConflict: 'id'
     });
@@ -255,35 +316,49 @@ export class SupabaseSessionRepository implements ISessionRepository {
 
     // 6. Upsert photos if present
     if (session.photos && session.photos.length > 0) {
-      const photoInserts = session.photos.map(mapPhotoDomainToDb);
+      const photoInserts = session.photos.map(p => ({
+        ...mapPhotoDomainToDb(p),
+        user_id: p.userId || effectiveUserId || null
+      }));
       await this.client.from('game_photos').upsert(photoInserts, { onConflict: 'id' });
     }
   }
 
-  async saveSessions(sessions: GameSession[]): Promise<void> {
+  async saveSessions(sessions: GameSession[], userId?: string): Promise<void> {
     for (const session of sessions) {
-      await this.saveSession(session);
+      await this.saveSession(session, userId);
     }
   }
 
-  async getActiveSessionId(): Promise<string | null> {
-    const { data } = await this.client
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'active_session_id')
-      .maybeSingle();
+  async getActiveSessionId(userId?: string): Promise<string | null> {
+    const effectiveUserId = await this.getEffectiveUserId(userId);
+    let query = this.client
+      .from('sessions')
+      .select('id')
+      .eq('status', 'active')
+      .order('started_at', { ascending: false })
+      .limit(1);
 
-    if (data && typeof data.value === 'string') {
-      return data.value;
+    if (effectiveUserId) {
+      query = query.eq('user_id', effectiveUserId);
     }
-    return null;
+
+    const { data } = await query.maybeSingle();
+    return data?.id || null;
   }
 
-  async setActiveSessionId(id: string | null): Promise<void> {
-    await this.client.from('app_settings').upsert({
-      key: 'active_session_id',
-      value: (id || '') as unknown as Database['public']['Tables']['app_settings']['Insert']['value']
-    });
+  async setActiveSessionId(id: string | null, userId?: string): Promise<void> {
+    // For backward compatibility, also keep app_settings synced when non-user
+    if (!userId) {
+      try {
+        await this.client.from('app_settings').upsert({
+          key: 'active_session_id',
+          value: (id || '') as unknown as Database['public']['Tables']['app_settings']['Insert']['value']
+        });
+      } catch {
+        // Ignore if app_settings is disabled/restricted
+      }
+    }
   }
 
   async saveRoundScore(
@@ -305,56 +380,107 @@ export class SupabaseSessionRepository implements ISessionRepository {
       { onConflict: 'id' }
     );
 
-    // Save score
+    // Upsert granular score entry
     const scoreId = `${roundId}_${playerId}`;
-    await this.client.from('round_scores').upsert(
-      {
-        id: scoreId,
-        round_id: roundId,
-        session_id: sessionId,
-        player_id: playerId,
-        base_score: score.baseScore,
-        multiplier: score.multiplier,
-        final_score: score.finalScore,
-        score_type: score.scoreType,
-        entered: score.entered
-      },
-      { onConflict: 'id' }
-    );
+    const insertData: Database['public']['Tables']['round_scores']['Insert'] = {
+      id: scoreId,
+      round_id: roundId,
+      session_id: sessionId,
+      player_id: playerId,
+      base_score: score.baseScore,
+      multiplier: score.multiplier,
+      final_score: score.finalScore,
+      score_type: score.scoreType,
+      entered: score.entered
+    };
+
+    const { error } = await this.client
+      .from('round_scores')
+      .upsert(insertData, { onConflict: 'id' });
+
+    if (error) {
+      console.error('[SupabaseSessionRepository] saveRoundScore error:', error);
+      throw error;
+    }
   }
 
   async finalizeSession(session: GameSession, results: SessionResult[]): Promise<void> {
-    const finalizedSession: GameSession = {
-      ...session,
-      status: 'completed',
-      completedAt: new Date().toISOString(),
-      isFinalized: true,
-      results
-    };
-    await this.saveSession(finalizedSession);
-    await this.setActiveSessionId(null);
+    const effectiveUserId = await this.getEffectiveUserId(session.userId);
+    const completedAt = new Date().toISOString();
+
+    // 1. Update session status
+    await this.client
+      .from('sessions')
+      .update({
+        status: 'completed',
+        completed_at: completedAt,
+        is_finalized: true
+      })
+      .eq('id', session.id);
+
+    // 2. Insert finalized results
+    const resultInserts = results.map(res => ({
+      id: `${session.id}_${res.playerId}`,
+      session_id: session.id,
+      player_id: res.playerId,
+      player_name: res.playerName,
+      total_score: res.totalScore,
+      final_position: res.finalPosition,
+      is_winner: res.isWinner,
+      is_runner_up: res.isRunnerUp,
+      is_tea_duty: res.isTeaDuty,
+      dick_hands_count: res.dickHandsCount,
+      busts_count: res.bustsCount
+    }));
+
+    await this.client.from('session_results').upsert(resultInserts, { onConflict: 'id' });
+
+    // 3. Clear active session
+    await this.setActiveSessionId(null, effectiveUserId);
   }
 }
 
 export class SupabaseStatsRepository implements IStatsRepository {
   constructor(private client: SupabaseClient<Database>) {}
 
-  async getPlayerStats(): Promise<Record<string, PlayerStats>> {
-    const { data, error } = await this.client.from('player_stats').select('*');
+  private async getEffectiveUserId(userId?: string): Promise<string | undefined> {
+    if (userId) return userId;
+    try {
+      const { data } = await this.client.auth.getUser();
+      return data.user?.id;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async getPlayerStats(userId?: string): Promise<Record<string, PlayerStats>> {
+    const effectiveUserId = await this.getEffectiveUserId(userId);
+    let query = this.client.from('player_stats').select('*');
+
+    if (effectiveUserId) {
+      query = query.eq('user_id', effectiveUserId);
+    }
+
+    const { data, error } = await query;
+
     if (error) {
       console.error('[SupabaseStatsRepository] getPlayerStats error:', error);
       throw error;
     }
 
-    const map: Record<string, PlayerStats> = {};
+    const result: Record<string, PlayerStats> = {};
     for (const row of data || []) {
-      map[row.player_id] = mapStatsDbToDomain(row);
+      result[row.player_id] = mapStatsDbToDomain(row);
     }
-    return map;
+    return result;
   }
 
-  async savePlayerStats(stats: Record<string, PlayerStats>): Promise<void> {
-    const inserts = Object.values(stats).map(mapStatsDomainToDb);
+  async savePlayerStats(stats: Record<string, PlayerStats>, userId?: string): Promise<void> {
+    const effectiveUserId = await this.getEffectiveUserId(userId);
+    const inserts = Object.values(stats).map(s => ({
+      ...mapStatsDomainToDb(s),
+      user_id: s.userId || effectiveUserId || null
+    }));
     if (inserts.length === 0) return;
 
     const { error } = await this.client.from('player_stats').upsert(inserts, {
@@ -370,15 +496,16 @@ export class SupabaseStatsRepository implements IStatsRepository {
   async updateStatsForSession(
     currentStats: Record<string, PlayerStats>,
     session: GameSession,
-    results: SessionResult[]
+    results: SessionResult[],
+    userId?: string
   ): Promise<Record<string, PlayerStats>> {
-    // Idempotency: verify session is not already finalized
     if (session.isFinalized) {
       return currentStats;
     }
 
+    const effectiveUserId = userId || session.userId;
     const updated = updatePlayerStatistics(currentStats, session, results);
-    await this.savePlayerStats(updated);
+    await this.savePlayerStats(updated, effectiveUserId);
     return updated;
   }
 }
@@ -386,7 +513,17 @@ export class SupabaseStatsRepository implements IStatsRepository {
 export class SupabasePhotoRepository implements IPhotoRepository {
   constructor(private client: SupabaseClient<Database>) {}
 
-  async getPhotosForSession(sessionId: string): Promise<GamePhoto[]> {
+  private async getEffectiveUserId(userId?: string): Promise<string | undefined> {
+    if (userId) return userId;
+    try {
+      const { data } = await this.client.auth.getUser();
+      return data.user?.id;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async getPhotosForSession(sessionId: string, _userId?: string): Promise<GamePhoto[]> {
     const { data, error } = await this.client
       .from('game_photos')
       .select('*')
@@ -401,11 +538,18 @@ export class SupabasePhotoRepository implements IPhotoRepository {
     return (data || []).map(mapPhotoDbToDomain);
   }
 
-  async getAllPhotos(): Promise<GamePhoto[]> {
-    const { data, error } = await this.client
+  async getAllPhotos(userId?: string): Promise<GamePhoto[]> {
+    const effectiveUserId = await this.getEffectiveUserId(userId);
+    let query = this.client
       .from('game_photos')
       .select('*')
       .order('uploaded_at', { ascending: false });
+
+    if (effectiveUserId) {
+      query = query.eq('user_id', effectiveUserId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('[SupabasePhotoRepository] getAllPhotos error:', error);
@@ -415,8 +559,13 @@ export class SupabasePhotoRepository implements IPhotoRepository {
     return (data || []).map(mapPhotoDbToDomain);
   }
 
-  async savePhotoMetadata(photo: GamePhoto): Promise<void> {
-    const insert = mapPhotoDomainToDb(photo);
+  async savePhotoMetadata(photo: GamePhoto, userId?: string): Promise<void> {
+    const effectiveUserId = await this.getEffectiveUserId(userId || photo.userId);
+    const insert = {
+      ...mapPhotoDomainToDb(photo),
+      user_id: effectiveUserId || null
+    };
+
     const { error } = await this.client.from('game_photos').upsert(insert, {
       onConflict: 'id'
     });
@@ -427,22 +576,22 @@ export class SupabasePhotoRepository implements IPhotoRepository {
     }
   }
 
-  async deletePhoto(sessionId: string, photoId: string, storagePath?: string): Promise<void> {
-    // 1. Delete DB record
+  async deletePhoto(sessionId: string, photoId: string, storagePath?: string, userId?: string): Promise<void> {
     const { error } = await this.client.from('game_photos').delete().eq('id', photoId);
     if (error) {
       console.error('[SupabasePhotoRepository] deletePhoto error:', error);
       throw error;
     }
 
-    // 2. If storagePath refers to bucket, delete from storage
     if (storagePath && storagePath.includes(STORAGE_BUCKET_GAME_SNAPS)) {
       try {
-        const fullPath = `${sessionId}/${photoId}_full.jpg`;
-        const thumbPath = `${sessionId}/${photoId}_thumb.jpg`;
+        const effectiveUserId = await this.getEffectiveUserId(userId);
+        const folder = effectiveUserId ? `${effectiveUserId}/${sessionId}` : sessionId;
+        const fullPath = `${folder}/${photoId}_full.jpg`;
+        const thumbPath = `${folder}/${photoId}_thumb.jpg`;
         await this.client.storage
           .from(STORAGE_BUCKET_GAME_SNAPS)
-          .remove([fullPath, thumbPath]);
+          .remove([fullPath, thumbPath, `${sessionId}/${photoId}_full.jpg`, `${sessionId}/${photoId}_thumb.jpg`]);
       } catch (err) {
         console.warn('[SupabasePhotoRepository] Storage file cleanup warning:', err);
       }
@@ -453,10 +602,13 @@ export class SupabasePhotoRepository implements IPhotoRepository {
     sessionId: string,
     photoId: string,
     fileOrBase64: File | string,
-    thumbnailDataUrl?: string
+    thumbnailDataUrl?: string,
+    userId?: string
   ): Promise<{ storagePath: string; thumbnailUrl: string }> {
-    const fullPath = `${sessionId}/${photoId}_full.jpg`;
-    const thumbPath = `${sessionId}/${photoId}_thumb.jpg`;
+    const effectiveUserId = await this.getEffectiveUserId(userId);
+    const folder = effectiveUserId ? `${effectiveUserId}/${sessionId}` : sessionId;
+    const fullPath = `${folder}/${photoId}_full.jpg`;
+    const thumbPath = `${folder}/${photoId}_thumb.jpg`;
 
     // Convert file / dataUrl to Blob
     const fullBlob = await this.toBlob(fileOrBase64);

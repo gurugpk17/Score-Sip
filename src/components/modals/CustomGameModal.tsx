@@ -43,16 +43,16 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="bg-[#1c2028] border border-[#3c4a42] rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5 shadow-2xl flex flex-col gap-4">
-        <div className="flex items-center justify-between border-b border-[#3c4a42]/60 pb-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5 shadow-2xl flex flex-col gap-4 text-[var(--color-text)]">
+        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#4edea3] text-2xl">tune</span>
-            <h2 className="font-headline font-bold text-lg text-[#dfe2ee]">Configure Custom Rummy</h2>
+            <span className="material-symbols-outlined text-[var(--color-primary)] text-2xl">tune</span>
+            <h2 className="font-headline font-bold text-lg text-[var(--color-text)]">Configure Custom Rummy</h2>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-[#262a33] text-[#bbcabf] hover:text-[#dfe2ee] flex items-center justify-center"
+            className="w-8 h-8 rounded-full bg-[var(--color-surface-elevated)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] flex items-center justify-center"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
@@ -61,14 +61,14 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
         <div className="space-y-4">
           {/* Game Name */}
           <div className="flex flex-col gap-1.5">
-            <label className="font-headline text-xs font-bold uppercase tracking-wider text-[#bbcabf]">
+            <label className="font-headline text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
               Game / Tournament Name
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full h-11 px-3 rounded-lg bg-[#262a33] border border-[#3c4a42] text-[#dfe2ee] font-body text-sm focus:outline-none focus:border-[#4edea3]"
+              className="w-full h-11 px-3 rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text)] font-body text-sm focus:outline-none focus:border-[var(--color-primary)]"
               placeholder="e.g. Midnight High Stakes"
             />
           </div>
@@ -76,18 +76,18 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
           {/* Number of Rounds */}
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-center">
-              <label className="font-headline text-xs font-bold uppercase tracking-wider text-[#bbcabf]">
+              <label className="font-headline text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
                 Total Rounds ({roundCount})
               </label>
-              <span className="font-headline text-xs text-[#4edea3] font-bold">{roundCount} Hands</span>
+              <span className="font-headline text-xs text-[var(--color-primary)] font-bold">{roundCount} Hands</span>
             </div>
 
             {/* Stepper with Direct Input */}
-            <div className="flex items-center gap-3 bg-[#0a0e16] p-2 rounded-xl border border-[#3c4a42]/40">
+            <div className="flex items-center gap-3 bg-[var(--color-bg)] p-2 rounded-xl border border-[var(--color-border)]">
               <button
                 type="button"
                 onClick={() => setRoundCount(Math.max(1, roundCount - 1))}
-                className="w-10 h-10 rounded-lg bg-[#262a33] hover:bg-[#353942] text-[#dfe2ee] font-headline text-xl font-bold flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                className="w-10 h-10 rounded-lg bg-[var(--color-surface-elevated)] hover:opacity-90 text-[var(--color-text)] font-headline text-xl font-bold flex items-center justify-center active:scale-95 transition-all cursor-pointer"
               >
                 -
               </button>
@@ -101,16 +101,16 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
                     const val = parseInt(e.target.value, 10);
                     if (!isNaN(val)) setRoundCount(Math.max(1, Math.min(50, val)));
                   }}
-                  className="w-20 text-center font-headline font-bold text-2xl text-[#4edea3] bg-transparent focus:outline-none"
+                  className="w-20 text-center font-headline font-bold text-2xl text-[var(--color-primary)] bg-transparent focus:outline-none"
                 />
-                <span className="font-headline text-[10px] text-[#86948a] uppercase tracking-wider">
+                <span className="font-headline text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">
                   Configured Rounds
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setRoundCount(Math.min(50, roundCount + 1))}
-                className="w-10 h-10 rounded-lg bg-[#262a33] hover:bg-[#353942] text-[#dfe2ee] font-headline text-xl font-bold flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                className="w-10 h-10 rounded-lg bg-[var(--color-surface-elevated)] hover:opacity-90 text-[var(--color-text)] font-headline text-xl font-bold flex items-center justify-center active:scale-95 transition-all cursor-pointer"
               >
                 +
               </button>
@@ -123,11 +123,11 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
                   key={count}
                   type="button"
                   onClick={() => setRoundCount(count)}
-                  style={roundCount === count ? { backgroundColor: '#4edea3', color: '#003824' } : undefined}
+                  style={roundCount === count ? { backgroundColor: 'var(--color-primary)', color: 'var(--color-primary-foreground)' } : undefined}
                   className={`px-3 py-1.5 rounded-lg font-headline text-xs font-bold transition-all shrink-0 cursor-pointer ${
                     roundCount === count
-                      ? 'bg-[#4edea3] text-[#003824] shadow-sm'
-                      : 'bg-[#262a33] text-[#bbcabf] hover:bg-[#353942]'
+                      ? 'shadow-sm'
+                      : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] border border-[var(--color-border)]'
                   }`}
                 >
                   {count}
@@ -137,18 +137,18 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
           </div>
 
           {/* Multiplier Configuration */}
-          <div className="bg-[#181c24] p-3 rounded-xl border border-[#3c4a42]/40 space-y-3">
-            <span className="font-headline text-xs font-bold uppercase tracking-wider text-[#ffb95f] block">
+          <div className="bg-[var(--color-surface-elevated)] p-3 rounded-xl border border-[var(--color-border)] space-y-3">
+            <span className="font-headline text-xs font-bold uppercase tracking-wider text-[var(--color-accent)] block">
               Round Multipliers
             </span>
 
             <div className="grid grid-cols-3 gap-2">
               <div className="flex flex-col gap-1">
-                <span className="text-[11px] text-[#bbcabf]">Round 1 Mult</span>
+                <span className="text-[11px] text-[var(--color-text-muted)]">Round 1 Mult</span>
                 <select
                   value={firstMult}
                   onChange={(e) => setFirstMult(Number(e.target.value))}
-                  className="h-9 px-2 rounded-lg bg-[#262a33] border border-[#3c4a42] text-xs font-headline text-[#dfe2ee]"
+                  className="h-9 px-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-xs font-headline text-[var(--color-text)]"
                 >
                   <option value={1}>1x (Normal)</option>
                   <option value={2}>2x (Double)</option>
@@ -157,11 +157,11 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[11px] text-[#bbcabf]">Middle Mult</span>
+                <span className="text-[11px] text-[var(--color-text-muted)]">Middle Mult</span>
                 <select
                   value={defaultMult}
                   onChange={(e) => setDefaultMult(Number(e.target.value))}
-                  className="h-9 px-2 rounded-lg bg-[#262a33] border border-[#3c4a42] text-xs font-headline text-[#dfe2ee]"
+                  className="h-9 px-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-xs font-headline text-[var(--color-text)]"
                 >
                   <option value={1}>1x (Normal)</option>
                   <option value={2}>2x (Double)</option>
@@ -169,11 +169,11 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[11px] text-[#bbcabf]">Final Round Mult</span>
+                <span className="text-[11px] text-[var(--color-text-muted)]">Final Round Mult</span>
                 <select
                   value={lastMult}
                   onChange={(e) => setLastMult(Number(e.target.value))}
-                  className="h-9 px-2 rounded-lg bg-[#262a33] border border-[#3c4a42] text-xs font-headline text-[#dfe2ee]"
+                  className="h-9 px-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-xs font-headline text-[var(--color-text)]"
                 >
                   <option value={1}>1x (Normal)</option>
                   <option value={2}>2x (Double)</option>
@@ -186,10 +186,10 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
           {/* FULL Penalty Value */}
           <div className="flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
-              <label className="font-headline text-xs font-bold uppercase tracking-wider text-[#bbcabf]">
+              <label className="font-headline text-xs font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
                 "FULL" Penalty Value
               </label>
-              <span className="font-headline text-xs text-[#ff7a73] font-bold">{fullPenalty} Points</span>
+              <span className="font-headline text-xs text-[#c93b2b] font-bold">{fullPenalty} Points</span>
             </div>
             <div className="flex items-center gap-2">
               {[40, 60, 80, 100, 120].map((val) => (
@@ -199,8 +199,8 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
                   onClick={() => setFullPenalty(val)}
                   className={`flex-1 h-9 rounded-lg font-headline text-xs font-bold transition-all ${
                     fullPenalty === val
-                      ? 'bg-[#ff7a73] text-[#410004]'
-                      : 'bg-[#262a33] text-[#bbcabf] hover:bg-[#353942]'
+                      ? 'bg-[#c93b2b] text-white shadow-sm'
+                      : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'
                   }`}
                 >
                   {val}
@@ -212,7 +212,7 @@ export const CustomGameModal: React.FC<CustomGameModalProps> = ({ isOpen, onClos
 
         <button
           onClick={handleSaveAndUse}
-          className="w-full h-12 rounded-xl bg-[#4edea3] hover:bg-[#6ffbbe] text-[#003824] font-headline font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-all mt-3"
+          className="w-full h-12 rounded-xl bg-[var(--color-primary)] hover:opacity-90 text-[var(--color-primary-foreground)] font-headline font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-all mt-3 cursor-pointer"
         >
           <span className="material-symbols-outlined text-lg">play_arrow</span>
           Save & Launch Table

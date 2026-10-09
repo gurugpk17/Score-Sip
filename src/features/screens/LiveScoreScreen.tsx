@@ -329,7 +329,7 @@ export const LiveScoreScreen: React.FC = () => {
                   </span>
                 </div>
                 <span className="font-body text-xs text-[#bbcabf] truncate">
-                  {highestPlayer?.name} trails by {teaDutyMargin} pts. 5 Cutting Chais on the line!
+                  {highestPlayer?.name} trails by {teaDutyMargin} pts. Highest total score owes tea.
                 </span>
               </div>
             </div>

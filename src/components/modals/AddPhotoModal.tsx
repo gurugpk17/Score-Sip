@@ -82,7 +82,7 @@ export const AddPhotoModal: React.FC = () => {
     'ROUND 5 CARD FLIP',
     'TEA DUTY',
     'GURU CROWNED',
-    'CHAI STAKE',
+    'TEA STAKE',
     'FESTIVE NIGHT'
   ];
 

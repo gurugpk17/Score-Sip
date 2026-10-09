@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useSessionStore } from './features/session/sessionStore';
 import { Header } from './components/layout/Header';
 import { BottomNav } from './components/layout/BottomNav';
+import { MenuDrawer } from './components/layout/MenuDrawer';
 import { Toast } from './components/ui/Toast';
 import { DashboardScreen } from './features/screens/DashboardScreen';
 import { GameVariantSetupScreen } from './features/screens/GameVariantSetupScreen';
@@ -25,52 +26,78 @@ export default function App() {
   const getHeaderProps = () => {
     switch (currentScreen) {
       case 'dashboard':
-        return { title: "RUMMY 7'S", subtitle: "Table Dashboard", showBack: false };
+        return {
+          title: "SCORE & SIP",
+          subtitle: "Keep the score. Enjoy the game.",
+          showBack: false
+        };
       case 'setup':
         return {
-          title: "ROUND ENTRY PAD",
-          subtitle: "Game & Table Setup",
+          title: "START GAME",
+          subtitle: "Variant & Table Setup",
           showBack: true,
           onBack: () => setScreen('dashboard')
         };
       case 'live':
         return {
-          title: "ROUND ENTRY PAD",
-          subtitle: activeSession ? `${activeSession.gameConfig.name} • Round ${activeSession.currentRoundNumber}` : "Live Score",
+          title: "ROUND ENTRY",
+          subtitle: activeSession ? `${activeSession.gameConfig.name} • Round ${activeSession.currentRoundNumber}` : "Score Entry",
           showBack: true,
           onBack: () => setScreen('dashboard')
         };
       case 'results':
         return {
           title: "MATCH RESULTS",
-          subtitle: "Official Scorecard & Verdict",
+          subtitle: "Scorecard & Final Standings",
           showBack: true,
           onBack: () => setScreen('dashboard')
         };
       case 'ledger':
-        return { title: "MATCH LEDGER", subtitle: "Session History", showBack: false };
+        return {
+          title: "PREVIOUS GAMES",
+          subtitle: "Match History & Ledgers",
+          showBack: true,
+          onBack: () => setScreen('dashboard')
+        };
       case 'rankings':
-        return { title: "LEADERBOARD", subtitle: "Rankings & Tea Wall", showBack: false };
+        return {
+          title: "MY STATS",
+          subtitle: "Player Standings & Tea Duties",
+          showBack: true,
+          onBack: () => setScreen('dashboard')
+        };
       case 'gallery':
-        return { title: "GAME NIGHT GALLERY", subtitle: "Photo Memories & Moments", showBack: false };
+        return {
+          title: "GAME MEMORIES",
+          subtitle: "Game Snaps & Photos",
+          showBack: true,
+          onBack: () => setScreen('dashboard')
+        };
       case 'game-details':
         return {
           title: "GAME DETAILS",
-          subtitle: "Game Snaps & Ledger",
+          subtitle: "Photos & Round Breakdown",
           showBack: true,
           onBack: () => setScreen('ledger')
         };
       default:
-        return { title: "RUMMY 7'S", subtitle: "Dashboard", showBack: false };
+        return {
+          title: "SCORE & SIP",
+          subtitle: "Keep the score. Enjoy the game.",
+          showBack: false
+        };
     }
   };
 
   const headerProps = getHeaderProps();
 
   return (
-    <div className="min-h-screen bg-[#0f131c] text-[#dfe2ee] flex flex-col relative selection:bg-[#10b981] selection:text-[#003824]">
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] flex flex-col relative selection:bg-[#10b981] selection:text-[#003824] transition-colors">
       {/* Dynamic Header */}
       <Header {...headerProps} />
+
+      {/* Slide-out Menu Drawer */}
+      <MenuDrawer />
 
       {/* Main Screen Container (Mobile-first centered max-w-md with desktop ambient support) */}
       <main className="flex-1 flex flex-col relative w-full pt-16 max-w-md mx-auto">

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f2b20"/>
+      <stop offset="100%" stop-color="#091812"/>
+    </linearGradient>
+    <linearGradient id="primary" x1="20" y1="20" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4edea3"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="url(#bg)"/>
+  <rect x="2" y="2" width="96" height="96" rx="22" stroke="#4edea3" stroke-opacity="0.25" stroke-width="2"/>
+  <!-- Elegant S-shape combining card suit vertex with curved cup steam -->
+  <path d="M67 31C63 24 55 21 47 21C34 21 25 29 25 40C25 53 38 56 52 60C67 64 74 70 74 79C74 90 62 94 49 94C37 94 28 88 23 80" stroke="url(#primary)" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Sip / cup accent arc -->
+  <path d="M57 22C68 22 76 27 76 36C76 43 69 48 59 48" stroke="#ffb95f" stroke-width="6" stroke-linecap="round"/>
+  <!-- Subtle ace pip / steam spark -->
+  <circle cx="77" cy="21" r="4.5" fill="#ffb95f"/>
+</svg>

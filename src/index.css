@@ -1,33 +1,96 @@
 @import "tailwindcss";
 
+:root {
+  /* DARK THEME TOKENS (Default) */
+  --bg-app: #0f131c;
+  --bg-surface: #141824;
+  --bg-card: #1c2028;
+  --bg-card-hover: #262a33;
+  --bg-elevated: #262a33;
+  --bg-muted: #181c24;
+  --bg-input: #262a33;
+
+  --text-primary: #dfe2ee;
+  --text-secondary: #bbcabf;
+  --text-muted: #86948a;
+
+  --brand-primary: #4edea3;
+  --brand-primary-bg: rgba(78, 222, 163, 0.15);
+  --brand-on-primary: #003824;
+
+  --brand-accent: #ffb95f;
+  --brand-accent-bg: rgba(255, 185, 95, 0.15);
+  --brand-on-accent: #2a1700;
+
+  --color-danger: #ff7a73;
+  --color-danger-bg: rgba(255, 122, 115, 0.15);
+  --color-danger-text: #ffb4ab;
+
+  --border-subtle: rgba(60, 74, 66, 0.4);
+  --border-card: rgba(60, 74, 66, 0.5);
+  --border-highlight: rgba(78, 222, 163, 0.35);
+
+  --nav-bg: rgba(10, 14, 22, 0.94);
+  --header-bg: rgba(10, 14, 22, 0.90);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+html.light {
+  /* LIGHT THEME TOKENS */
+  --bg-app: #f7f6f2;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f3f1ea;
+  --bg-elevated: #f4f2eb;
+  --bg-muted: #ece9e0;
+  --bg-input: #f0ede4;
+
+  --text-primary: #18221d;
+  --text-secondary: #4b5a51;
+  --text-muted: #718177;
+
+  --brand-primary: #0f6344;
+  --brand-primary-bg: rgba(15, 99, 68, 0.12);
+  --brand-on-primary: #ffffff;
+
+  --brand-accent: #b57c14;
+  --brand-accent-bg: rgba(181, 124, 20, 0.12);
+  --brand-on-accent: #ffffff;
+
+  --color-danger: #c93033;
+  --color-danger-bg: rgba(201, 48, 51, 0.12);
+  --color-danger-text: #961b1e;
+
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-card: rgba(0, 0, 0, 0.12);
+  --border-highlight: rgba(15, 99, 68, 0.3);
+
+  --nav-bg: rgba(255, 255, 255, 0.96);
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
 @theme {
-  --color-surface: #0f131c;
-  --color-surface-dim: #0f131c;
-  --color-surface-bright: #353942;
-  --color-surface-container-lowest: #0a0e16;
-  --color-surface-container-low: #181c24;
-  --color-surface-container: #1c2028;
-  --color-surface-container-high: #262a33;
-  --color-surface-container-highest: #31353e;
-  --color-on-surface: #dfe2ee;
-  --color-on-surface-variant: #bbcabf;
-  --color-primary: #4edea3;
-  --color-primary-container: #10b981;
-  --color-on-primary: #003824;
-  --color-on-primary-container: #00422b;
-  --color-secondary: #ffb95f;
-  --color-secondary-container: #ee9800;
-  --color-on-secondary: #472a00;
-  --color-tertiary: #ffb3ad;
-  --color-tertiary-container: #ff7a73;
-  --color-on-tertiary: #68000a;
-  --color-error: #ffb4ab;
-  --color-error-container: #93000a;
-  --color-on-error: #690005;
-  --color-outline: #86948a;
-  --color-outline-variant: #3c4a42;
-  --color-background: #0f131c;
-  --color-on-background: #dfe2ee;
+  --color-surface: var(--bg-app);
+  --color-surface-dim: var(--bg-app);
+  --color-surface-bright: var(--bg-elevated);
+  --color-surface-container-lowest: var(--bg-muted);
+  --color-surface-container-low: var(--bg-muted);
+  --color-surface-container: var(--bg-card);
+  --color-surface-container-high: var(--bg-card-hover);
+  --color-surface-container-highest: var(--bg-elevated);
+  --color-on-surface: var(--text-primary);
+  --color-on-surface-variant: var(--text-secondary);
+  --color-primary: var(--brand-primary);
+  --color-primary-container: var(--brand-primary);
+  --color-on-primary: var(--brand-on-primary);
+  --color-secondary: var(--brand-accent);
+  --color-tertiary: var(--color-danger);
+  --color-error: var(--color-danger);
+  --color-outline: var(--text-muted);
+  --color-outline-variant: var(--border-subtle);
+  --color-background: var(--bg-app);
+  --color-on-background: var(--text-primary);
 
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-heading: 'Space Grotesk', system-ui, -apple-system, sans-serif;
@@ -35,11 +98,12 @@
 
 @layer base {
   body {
-    background-color: var(--color-surface);
-    color: var(--color-on-surface);
+    background-color: var(--bg-app);
+    color: var(--text-primary);
     font-family: var(--font-sans);
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 }
 
@@ -59,4 +123,3 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-

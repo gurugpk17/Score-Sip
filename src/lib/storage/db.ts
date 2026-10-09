@@ -87,130 +87,156 @@ export async function compressImageFile(
   });
 }
 
+import { getUserStorageKey } from '../repositories/localStorageRepo';
+
 export class StorageService {
-  static getSessions(): GameSession[] {
+  static getSessions(userId?: string): GameSession[] {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.SESSIONS);
+      const key = getUserStorageKey('sessions', userId);
+      const raw = localStorage.getItem(key);
       if (!raw) {
+        if (userId) {
+          return [];
+        }
         this.saveSessions([INITIAL_COMPLETED_SESSION, SECOND_COMPLETED_SESSION]);
         return [INITIAL_COMPLETED_SESSION, SECOND_COMPLETED_SESSION];
       }
       const parsed: GameSession[] = JSON.parse(raw);
-      // If older cached session does not have photos, merge seed photos
-      let changed = false;
-      const merged = parsed.map(s => {
-        if (s.id === INITIAL_COMPLETED_SESSION.id && (!s.photos || s.photos.length === 0)) {
+      if (!userId) {
+        let changed = false;
+        const merged = parsed.map(s => {
+          if (s.id === INITIAL_COMPLETED_SESSION.id && (!s.photos || s.photos.length === 0)) {
+            changed = true;
+            return { ...s, photos: INITIAL_COMPLETED_SESSION.photos };
+          }
+          return s;
+        });
+
+        if (!merged.some(s => s.id === SECOND_COMPLETED_SESSION.id)) {
+          merged.push(SECOND_COMPLETED_SESSION);
           changed = true;
-          return { ...s, photos: INITIAL_COMPLETED_SESSION.photos };
         }
-        return s;
-      });
 
-      if (!merged.some(s => s.id === SECOND_COMPLETED_SESSION.id)) {
-        merged.push(SECOND_COMPLETED_SESSION);
-        changed = true;
+        if (changed) {
+          this.saveSessions(merged);
+        }
+        return merged;
       }
-
-      if (changed) {
-        this.saveSessions(merged);
-      }
-      return merged;
+      return parsed;
     } catch {
-      return [INITIAL_COMPLETED_SESSION, SECOND_COMPLETED_SESSION];
+      return userId ? [] : [INITIAL_COMPLETED_SESSION, SECOND_COMPLETED_SESSION];
     }
   }
 
-  static saveSessions(sessions: GameSession[]): void {
+  static saveSessions(sessions: GameSession[], userId?: string): void {
     try {
-      localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+      const key = getUserStorageKey('sessions', userId);
+      localStorage.setItem(key, JSON.stringify(sessions));
     } catch (e) {
       console.warn('Storage saveSessions failed', e);
     }
-    persistenceRepository.sessions.saveSessions(sessions).catch(e => {
+    persistenceRepository.sessions.saveSessions(sessions, userId).catch(e => {
       console.warn('[StorageService] persistence saveSessions failed', e);
     });
   }
 
-  static getActiveSessionId(): string | null {
+  static getActiveSessionId(userId?: string): string | null {
     try {
+      if (userId) {
+        const sessions = this.getSessions(userId);
+        const active = sessions.find(s => s.status === 'active');
+        if (active) return active.id;
+        return localStorage.getItem(getUserStorageKey('active_session_id', userId));
+      }
       return localStorage.getItem(STORAGE_KEYS.ACTIVE_SESSION_ID);
     } catch {
       return null;
     }
   }
 
-  static setActiveSessionId(id: string | null): void {
+  static setActiveSessionId(id: string | null, userId?: string): void {
     try {
+      const key = getUserStorageKey('active_session_id', userId);
       if (id) {
-        localStorage.setItem(STORAGE_KEYS.ACTIVE_SESSION_ID, id);
+        localStorage.setItem(key, id);
       } else {
-        localStorage.removeItem(STORAGE_KEYS.ACTIVE_SESSION_ID);
+        localStorage.removeItem(key);
       }
     } catch (e) {
       console.warn('Storage setActiveSessionId failed', e);
     }
-    persistenceRepository.sessions.setActiveSessionId(id).catch(e => {
+    persistenceRepository.sessions.setActiveSessionId(id, userId).catch(e => {
       console.warn('[StorageService] persistence setActiveSessionId failed', e);
     });
   }
 
-  static getPlayers(): Player[] {
+  static getPlayers(userId?: string): Player[] {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.PLAYERS);
+      const key = getUserStorageKey('players', userId);
+      const raw = localStorage.getItem(key);
       if (!raw) {
+        if (userId) {
+          return [];
+        }
         this.savePlayers(INITIAL_PLAYERS);
         return INITIAL_PLAYERS;
       }
       return JSON.parse(raw);
     } catch {
-      return INITIAL_PLAYERS;
+      return userId ? [] : INITIAL_PLAYERS;
     }
   }
 
-  static savePlayers(players: Player[]): void {
+  static savePlayers(players: Player[], userId?: string): void {
     try {
-      localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(players));
+      const key = getUserStorageKey('players', userId);
+      localStorage.setItem(key, JSON.stringify(players));
     } catch (e) {
       console.warn('Storage savePlayers failed', e);
     }
-    persistenceRepository.players.savePlayers(players).catch(e => {
+    persistenceRepository.players.savePlayers(players, userId).catch(e => {
       console.warn('[StorageService] persistence savePlayers failed', e);
     });
   }
 
-  static getPlayerStats(): Record<string, PlayerStats> {
+  static getPlayerStats(userId?: string): Record<string, PlayerStats> {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.STATS);
+      const key = getUserStorageKey('stats', userId);
+      const raw = localStorage.getItem(key);
       if (!raw) {
+        if (userId) {
+          return {};
+        }
         this.savePlayerStats(INITIAL_STATS);
         return INITIAL_STATS;
       }
       return JSON.parse(raw);
     } catch {
-      return INITIAL_STATS;
+      return userId ? {} : INITIAL_STATS;
     }
   }
 
-  static savePlayerStats(stats: Record<string, PlayerStats>): void {
+  static savePlayerStats(stats: Record<string, PlayerStats>, userId?: string): void {
     try {
-      localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats));
+      const key = getUserStorageKey('stats', userId);
+      localStorage.setItem(key, JSON.stringify(stats));
     } catch (e) {
       console.warn('Storage savePlayerStats failed', e);
     }
-    persistenceRepository.stats.savePlayerStats(stats).catch(e => {
+    persistenceRepository.stats.savePlayerStats(stats, userId).catch(e => {
       console.warn('[StorageService] persistence savePlayerStats failed', e);
     });
   }
 
-  static async syncFromPersistence(): Promise<{
+  static async syncFromPersistence(userId?: string): Promise<{
     sessions: GameSession[];
     players: Player[];
     stats: Record<string, PlayerStats>;
   }> {
     const [sessions, players, stats] = await Promise.all([
-      persistenceRepository.sessions.getSessions(),
-      persistenceRepository.players.getPlayers(),
-      persistenceRepository.stats.getPlayerStats()
+      persistenceRepository.sessions.getSessions(userId),
+      persistenceRepository.players.getPlayers(userId),
+      persistenceRepository.stats.getPlayerStats(userId)
     ]);
     return { sessions, players, stats };
   }

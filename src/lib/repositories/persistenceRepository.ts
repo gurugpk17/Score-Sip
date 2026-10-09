@@ -56,51 +56,51 @@ export class PersistenceRepository implements IPersistenceRepository {
       this.cloudConnected = true;
     }
 
-    // Wrap repositories with fallback capability
+    // Wrap repositories with fallback capability and optional userId scoping
     this.players = {
-      getPlayers: async () => {
+      getPlayers: async (userId?: string) => {
         if (this.cloudConnected && this.supabasePlayers) {
           try {
-            const cloudPlayers = await this.supabasePlayers.getPlayers();
-            if (cloudPlayers.length > 0) {
-              await this.localPlayers.savePlayers(cloudPlayers);
+            const cloudPlayers = await this.supabasePlayers.getPlayers(userId);
+            if (cloudPlayers.length > 0 || userId) {
+              await this.localPlayers.savePlayers(cloudPlayers, userId);
               return cloudPlayers;
             }
           } catch (err) {
             console.warn('[Persistence] Cloud getPlayers failed, falling back to local', err);
           }
         }
-        return this.localPlayers.getPlayers();
+        return this.localPlayers.getPlayers(userId);
       },
 
-      savePlayers: async (players: Player[]) => {
-        await this.localPlayers.savePlayers(players);
+      savePlayers: async (players: Player[], userId?: string) => {
+        await this.localPlayers.savePlayers(players, userId);
         if (this.cloudConnected && this.supabasePlayers) {
           try {
-            await this.supabasePlayers.savePlayers(players);
+            await this.supabasePlayers.savePlayers(players, userId);
           } catch (err) {
             console.warn('[Persistence] Cloud savePlayers failed (queued locally)', err);
           }
         }
       },
 
-      createPlayer: async (player: Player) => {
-        await this.localPlayers.createPlayer(player);
+      createPlayer: async (player: Player, userId?: string) => {
+        const createdLocal = await this.localPlayers.createPlayer(player, userId);
         if (this.cloudConnected && this.supabasePlayers) {
           try {
-            await this.supabasePlayers.createPlayer(player);
+            await this.supabasePlayers.createPlayer(createdLocal, userId);
           } catch (err) {
             console.warn('[Persistence] Cloud createPlayer failed (saved locally)', err);
           }
         }
-        return player;
+        return createdLocal;
       },
 
-      deletePlayer: async (playerId: string) => {
-        await this.localPlayers.deletePlayer(playerId);
+      deletePlayer: async (playerId: string, userId?: string) => {
+        await this.localPlayers.deletePlayer(playerId, userId);
         if (this.cloudConnected && this.supabasePlayers) {
           try {
-            await this.supabasePlayers.deletePlayer(playerId);
+            await this.supabasePlayers.deletePlayer(playerId, userId);
           } catch (err) {
             console.warn('[Persistence] Cloud deletePlayer failed', err);
           }
@@ -109,72 +109,73 @@ export class PersistenceRepository implements IPersistenceRepository {
     };
 
     this.sessions = {
-      getSessions: async () => {
+      getSessions: async (userId?: string) => {
         if (this.cloudConnected && this.supabaseSessions) {
           try {
-            const cloudSessions = await this.supabaseSessions.getSessions();
-            if (cloudSessions.length > 0) {
-              await this.localSessions.saveSessions(cloudSessions);
+            const cloudSessions = await this.supabaseSessions.getSessions(userId);
+            if (cloudSessions.length > 0 || userId) {
+              await this.localSessions.saveSessions(cloudSessions, userId);
               return cloudSessions;
             }
           } catch (err) {
             console.warn('[Persistence] Cloud getSessions failed, falling back to local', err);
           }
         }
-        return this.localSessions.getSessions();
+        return this.localSessions.getSessions(userId);
       },
 
-      getSessionById: async (id: string) => {
+      getSessionById: async (id: string, userId?: string) => {
         if (this.cloudConnected && this.supabaseSessions) {
           try {
-            const session = await this.supabaseSessions.getSessionById(id);
+            const session = await this.supabaseSessions.getSessionById(id, userId);
             if (session) return session;
           } catch (err) {
             console.warn('[Persistence] Cloud getSessionById failed', err);
           }
         }
-        return this.localSessions.getSessionById(id);
+        return this.localSessions.getSessionById(id, userId);
       },
 
-      saveSession: async (session: GameSession) => {
-        await this.localSessions.saveSession(session);
+      saveSession: async (session: GameSession, userId?: string) => {
+        const effectiveUser = userId || session.userId;
+        await this.localSessions.saveSession(session, effectiveUser);
         if (this.cloudConnected && this.supabaseSessions) {
           try {
-            await this.supabaseSessions.saveSession(session);
+            await this.supabaseSessions.saveSession(session, effectiveUser);
           } catch (err) {
             console.warn('[Persistence] Cloud saveSession failed (saved locally)', err);
           }
         }
       },
 
-      saveSessions: async (sessions: GameSession[]) => {
-        await this.localSessions.saveSessions(sessions);
+      saveSessions: async (sessions: GameSession[], userId?: string) => {
+        await this.localSessions.saveSessions(sessions, userId);
         if (this.cloudConnected && this.supabaseSessions) {
           try {
-            await this.supabaseSessions.saveSessions(sessions);
+            await this.supabaseSessions.saveSessions(sessions, userId);
           } catch (err) {
             console.warn('[Persistence] Cloud saveSessions failed', err);
           }
         }
       },
 
-      getActiveSessionId: async () => {
+      getActiveSessionId: async (userId?: string) => {
         if (this.cloudConnected && this.supabaseSessions) {
           try {
-            const id = await this.supabaseSessions.getActiveSessionId();
-            if (id !== undefined) return id;
+            const id = await this.supabaseSessions.getActiveSessionId(userId);
+            if (id !== undefined && id !== null) return id;
           } catch (err) {
             console.warn('[Persistence] Cloud getActiveSessionId failed', err);
           }
         }
-        return this.localSessions.getActiveSessionId();
+        return this.localSessions.getActiveSessionId(userId);
       },
 
-      setActiveSessionId: async (id: string | null) => {
-        await this.localSessions.setActiveSessionId(id);
+      setActiveSessionId: async (id: string | null, userId?: string) => {
+        await this.localSessions.setActiveSessionId(id, userId);
         if (this.cloudConnected && this.supabaseSessions) {
           try {
-            await this.supabaseSessions.setActiveSessionId(id);
+            await this.supabaseSessions.setActiveSessionId(id, userId);
           } catch (err) {
             console.warn('[Persistence] Cloud setActiveSessionId failed', err);
           }
@@ -210,26 +211,26 @@ export class PersistenceRepository implements IPersistenceRepository {
     };
 
     this.stats = {
-      getPlayerStats: async () => {
+      getPlayerStats: async (userId?: string) => {
         if (this.cloudConnected && this.supabaseStats) {
           try {
-            const cloudStats = await this.supabaseStats.getPlayerStats();
-            if (Object.keys(cloudStats).length > 0) {
-              await this.localStats.savePlayerStats(cloudStats);
+            const cloudStats = await this.supabaseStats.getPlayerStats(userId);
+            if (Object.keys(cloudStats).length > 0 || userId) {
+              await this.localStats.savePlayerStats(cloudStats, userId);
               return cloudStats;
             }
           } catch (err) {
             console.warn('[Persistence] Cloud getPlayerStats failed, falling back to local', err);
           }
         }
-        return this.localStats.getPlayerStats();
+        return this.localStats.getPlayerStats(userId);
       },
 
-      savePlayerStats: async (stats: Record<string, PlayerStats>) => {
-        await this.localStats.savePlayerStats(stats);
+      savePlayerStats: async (stats: Record<string, PlayerStats>, userId?: string) => {
+        await this.localStats.savePlayerStats(stats, userId);
         if (this.cloudConnected && this.supabaseStats) {
           try {
-            await this.supabaseStats.savePlayerStats(stats);
+            await this.supabaseStats.savePlayerStats(stats, userId);
           } catch (err) {
             console.warn('[Persistence] Cloud savePlayerStats failed', err);
           }
@@ -239,12 +240,14 @@ export class PersistenceRepository implements IPersistenceRepository {
       updateStatsForSession: async (
         currentStats: Record<string, PlayerStats>,
         session: GameSession,
-        results: SessionResult[]
+        results: SessionResult[],
+        userId?: string
       ) => {
-        const updatedLocal = await this.localStats.updateStatsForSession(currentStats, session, results);
+        const effectiveUser = userId || session.userId;
+        const updatedLocal = await this.localStats.updateStatsForSession(currentStats, session, results, effectiveUser);
         if (this.cloudConnected && this.supabaseStats) {
           try {
-            await this.supabaseStats.updateStatsForSession(currentStats, session, results);
+            await this.supabaseStats.updateStatsForSession(currentStats, session, results, effectiveUser);
           } catch (err) {
             console.warn('[Persistence] Cloud updateStatsForSession failed', err);
           }
@@ -254,44 +257,45 @@ export class PersistenceRepository implements IPersistenceRepository {
     };
 
     this.photos = {
-      getPhotosForSession: async (sessionId: string) => {
+      getPhotosForSession: async (sessionId: string, userId?: string) => {
         if (this.cloudConnected && this.supabasePhotos) {
           try {
-            return await this.supabasePhotos.getPhotosForSession(sessionId);
+            return await this.supabasePhotos.getPhotosForSession(sessionId, userId);
           } catch (err) {
             console.warn('[Persistence] Cloud getPhotosForSession failed', err);
           }
         }
-        return this.localPhotos.getPhotosForSession(sessionId);
+        return this.localPhotos.getPhotosForSession(sessionId, userId);
       },
 
-      getAllPhotos: async () => {
+      getAllPhotos: async (userId?: string) => {
         if (this.cloudConnected && this.supabasePhotos) {
           try {
-            return await this.supabasePhotos.getAllPhotos();
+            return await this.supabasePhotos.getAllPhotos(userId);
           } catch (err) {
             console.warn('[Persistence] Cloud getAllPhotos failed', err);
           }
         }
-        return this.localPhotos.getAllPhotos();
+        return this.localPhotos.getAllPhotos(userId);
       },
 
-      savePhotoMetadata: async (photo: GamePhoto) => {
-        await this.localPhotos.savePhotoMetadata(photo);
+      savePhotoMetadata: async (photo: GamePhoto, userId?: string) => {
+        const effectiveUser = userId || photo.userId;
+        await this.localPhotos.savePhotoMetadata(photo, effectiveUser);
         if (this.cloudConnected && this.supabasePhotos) {
           try {
-            await this.supabasePhotos.savePhotoMetadata(photo);
+            await this.supabasePhotos.savePhotoMetadata(photo, effectiveUser);
           } catch (err) {
             console.warn('[Persistence] Cloud savePhotoMetadata failed', err);
           }
         }
       },
 
-      deletePhoto: async (sessionId: string, photoId: string, storagePath?: string) => {
-        await this.localPhotos.deletePhoto(sessionId, photoId);
+      deletePhoto: async (sessionId: string, photoId: string, storagePath?: string, userId?: string) => {
+        await this.localPhotos.deletePhoto(sessionId, photoId, storagePath, userId);
         if (this.cloudConnected && this.supabasePhotos) {
           try {
-            await this.supabasePhotos.deletePhoto(sessionId, photoId, storagePath);
+            await this.supabasePhotos.deletePhoto(sessionId, photoId, storagePath, userId);
           } catch (err) {
             console.warn('[Persistence] Cloud deletePhoto failed', err);
           }
@@ -302,7 +306,8 @@ export class PersistenceRepository implements IPersistenceRepository {
         sessionId: string,
         photoId: string,
         fileOrBase64: File | string,
-        thumbnailDataUrl?: string
+        thumbnailDataUrl?: string,
+        userId?: string
       ) => {
         if (this.cloudConnected && this.supabasePhotos) {
           try {
@@ -310,13 +315,14 @@ export class PersistenceRepository implements IPersistenceRepository {
               sessionId,
               photoId,
               fileOrBase64,
-              thumbnailDataUrl
+              thumbnailDataUrl,
+              userId
             );
           } catch (err) {
             console.warn('[Persistence] Cloud uploadPhoto failed, using local fallback', err);
           }
         }
-        return this.localPhotos.uploadPhoto(sessionId, photoId, fileOrBase64, thumbnailDataUrl);
+        return this.localPhotos.uploadPhoto(sessionId, photoId, fileOrBase64, thumbnailDataUrl, userId);
       },
 
       toggleLike: async (photoId: string) => {

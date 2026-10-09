@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { User } from '@supabase/supabase-js';
 import { GameConfig, GamePhoto, GameRound, GameSession, GameVariantType, Player, PlayerStats, SessionResult } from '../../domain/models/types';
 import { PRESET_GAMES, STANDARD_FULL_VALUE } from '../../domain/scoring/rules';
 import {
@@ -9,9 +10,10 @@ import {
 } from '../../domain/scoring/engine';
 import { StorageService } from '../../lib/storage/db';
 import { persistenceRepository } from '../../lib/repositories/persistenceRepository';
-import { triggerHaptic } from '../../lib/utils/haptics';
+import { triggerHaptic, getHapticsEnabled, setHapticsEnabled } from '../../lib/utils/haptics';
+import { getSupabaseClient } from '../../lib/supabase/client';
 
-export type ScreenView = 'dashboard' | 'setup' | 'live' | 'results' | 'ledger' | 'rankings' | 'gallery' | 'game-details';
+export type ScreenView = 'dashboard' | 'setup' | 'live' | 'results' | 'ledger' | 'rankings' | 'gallery' | 'game-details' | 'players';
 
 interface SessionState {
   currentScreen: ScreenView;
@@ -33,16 +35,38 @@ interface SessionState {
   deleteConfirmPhoto: { photo: GamePhoto; sessionId: string } | null;
   addPhotoModalSessionId: string | null;
 
-  // UI state
+  // UI & Menu & Theme state
+  user: User | null;
+  authLoading: boolean;
+  theme: 'light' | 'dark';
   hapticsEnabled: boolean;
   toastMessage: string | null;
   viewingHistoricalSessionId: string | null;
+  isMenuOpen: boolean;
+  isProfileOpen: boolean;
+  isSettingsOpen: boolean;
+  isRulesOpen: boolean;
+  isCustomGameOpen: boolean;
 
   // Actions
   setScreen: (screen: ScreenView) => void;
   selectVariant: (variant: GameVariantType) => void;
   setCustomGameConfig: (config: Partial<GameConfig>) => void;
   
+  // Theme & Menu Modals
+  toggleTheme: () => void;
+  setTheme: (theme: 'light' | 'dark') => void;
+  setMenuOpen: (open: boolean) => void;
+  setProfileOpen: (open: boolean) => void;
+  setSettingsOpen: (open: boolean) => void;
+  setRulesOpen: (open: boolean) => void;
+  setCustomGameOpen: (open: boolean) => void;
+
+  // Authentication
+  signInWithGoogle: () => Promise<void>;
+  signOut: () => Promise<void>;
+  syncUserData: (userId?: string) => Promise<void>;
+
   // Table Setup
   addPlayerToRoster: (name: string) => boolean;
   removePlayerFromRoster: (playerId: string) => void;
@@ -85,6 +109,10 @@ interface SessionState {
 }
 
 export const useSessionStore = create<SessionState>((set, get) => {
+  const initialTheme = typeof window !== 'undefined'
+    ? (localStorage.getItem('score_sip_theme') as 'light' | 'dark') || 'dark'
+    : 'dark';
+
   const initialSessions = StorageService.getSessions();
   const initialPlayers = StorageService.getPlayers();
   const initialStats = StorageService.getPlayerStats();
@@ -116,9 +144,17 @@ export const useSessionStore = create<SessionState>((set, get) => {
     deleteConfirmPhoto: null,
     addPhotoModalSessionId: null,
 
-    hapticsEnabled: true,
+    user: null,
+    authLoading: true,
+    theme: initialTheme,
+    hapticsEnabled: getHapticsEnabled(),
     toastMessage: null,
     viewingHistoricalSessionId: null,
+    isMenuOpen: false,
+    isProfileOpen: false,
+    isSettingsOpen: false,
+    isRulesOpen: false,
+    isCustomGameOpen: false,
     isCloudConnected: persistenceRepository.isCloudConnected(),
 
     setScreen: (screen) => {
@@ -137,10 +173,92 @@ export const useSessionStore = create<SessionState>((set, get) => {
       }));
     },
 
+    setMenuOpen: (open) => set({ isMenuOpen: open }),
+    setProfileOpen: (open) => set({ isProfileOpen: open }),
+    setSettingsOpen: (open) => set({ isSettingsOpen: open }),
+    setRulesOpen: (open) => set({ isRulesOpen: open }),
+    setCustomGameOpen: (open) => set({ isCustomGameOpen: open }),
+
+    toggleTheme: () => {
+      const nextTheme = get().theme === 'dark' ? 'light' : 'dark';
+      get().setTheme(nextTheme);
+    },
+
+    setTheme: (theme) => {
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.remove('light', 'dark');
+        document.documentElement.classList.add(theme);
+        localStorage.setItem('score_sip_theme', theme);
+      }
+      triggerHaptic('selection');
+      set({ theme });
+    },
+
+    signInWithGoogle: async () => {
+      const client = getSupabaseClient();
+      if (!client) {
+        get().showToast("Cloud connection unavailable (offline mode).");
+        return;
+      }
+      try {
+        const { error } = await client.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin
+          }
+        });
+        if (error) {
+          console.error('[Auth] Google sign in error:', error);
+          get().showToast(`Sign in error: ${error.message}`);
+        }
+      } catch (err) {
+        console.error('[Auth] Sign in exception:', err);
+        get().showToast("Unable to start Google sign-in.");
+      }
+    },
+
+    signOut: async () => {
+      const client = getSupabaseClient();
+      if (client) {
+        try {
+          await client.auth.signOut();
+        } catch (err) {
+          console.warn('[Auth] Sign out error:', err);
+        }
+      }
+      set({ user: null });
+      // Reload guest data safely
+      await get().syncUserData(undefined);
+      get().showToast("Signed out successfully.");
+    },
+
+    syncUserData: async (userId?: string) => {
+      const { user } = get();
+      const targetUserId = userId !== undefined ? userId : user?.id;
+
+      try {
+        const { sessions, players, stats } = await StorageService.syncFromPersistence(targetUserId);
+        const activeId = await persistenceRepository.sessions.getActiveSessionId(targetUserId);
+        const activeSess = activeId 
+          ? sessions.find(s => s.id === activeId && s.status === 'active') || null
+          : sessions.find(s => s.status === 'active') || null;
+
+        set({
+          historySessions: sessions,
+          playersRoster: players,
+          playerStats: stats,
+          activeSession: activeSess,
+          isCloudConnected: persistenceRepository.isCloudConnected()
+        });
+      } catch (err) {
+        console.warn('[sessionStore] syncUserData warning:', err);
+      }
+    },
+
     addPlayerToRoster: (name) => {
       const cleanName = name.trim();
       if (!cleanName) return false;
-      const { playersRoster, activeSession } = get();
+      const { playersRoster, activeSession, user } = get();
 
       // If active session is running, table lock is enforced!
       if (activeSession && activeSession.status === 'active') {
@@ -156,6 +274,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const colors = ['#10b981', '#ffb95f', '#ff7a73', '#6ffbbe', '#ffb4ab', '#ee9800'];
       const newPlayer: Player = {
         id: `p_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        userId: user ? user.id : undefined,
         name: cleanName,
         seatNumber: playersRoster.length + 1,
         initials: cleanName.charAt(0).toUpperCase(),
@@ -163,14 +282,14 @@ export const useSessionStore = create<SessionState>((set, get) => {
       };
 
       const updated = [...playersRoster, newPlayer];
-      StorageService.savePlayers(updated);
+      StorageService.savePlayers(updated, user?.id);
       triggerHaptic('medium');
       set({ playersRoster: updated });
       return true;
     },
 
     removePlayerFromRoster: (playerId) => {
-      const { activeSession, playersRoster } = get();
+      const { activeSession, playersRoster, user } = get();
       if (activeSession && activeSession.status === 'active') {
         get().showToast("Table lock enforced! Cannot remove players during active match.");
         return;
@@ -179,13 +298,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const filtered = playersRoster.filter(p => p.id !== playerId);
       // Renumber seats
       const renumbered = filtered.map((p, idx) => ({ ...p, seatNumber: idx + 1 }));
-      StorageService.savePlayers(renumbered);
+      StorageService.savePlayers(renumbered, user?.id);
       triggerHaptic('light');
       set({ playersRoster: renumbered });
     },
 
     startNewSession: () => {
-      const { selectedVariant, customGameConfig, playersRoster } = get();
+      const { selectedVariant, customGameConfig, playersRoster, user } = get();
       if (playersRoster.length < 2) {
         get().showToast("Need at least 2 players to start a session!");
         return;
@@ -206,6 +325,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
       const newSession: GameSession = {
         id: `session_${Date.now()}`,
+        userId: user ? user.id : undefined,
         name: `${gameConfig.name} Match #${Math.floor(100 + Math.random() * 900)}`,
         gameConfig,
         status: 'active',
@@ -214,15 +334,14 @@ export const useSessionStore = create<SessionState>((set, get) => {
         rounds,
         startedAt: new Date().toISOString(),
         isFinalized: false,
-        tableNote: `Table #${Math.floor(Math.random() * 20) + 1} • Local Session Encrypted`
+        tableNote: `Table #${Math.floor(Math.random() * 20) + 1}`
       };
 
-      // Set active scoring player to first player in seat 1
       const firstPlayerId = playersRoster[0]?.id || null;
 
-      StorageService.setActiveSessionId(newSession.id);
+      StorageService.setActiveSessionId(newSession.id, user?.id);
       const allSessions = [newSession, ...get().historySessions.filter(s => s.id !== newSession.id)];
-      StorageService.saveSessions(allSessions);
+      StorageService.saveSessions(allSessions, user?.id);
 
       set({
         activeSession: newSession,
@@ -241,7 +360,6 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (!activeSession) return;
       
       const currentRound = activeSession.rounds[activeSession.currentRoundNumber - 1];
-      // Pick first player who hasn't entered score yet, or first player
       const pendingPlayer = activeSession.players.find(p => !currentRound?.scores[p.id]?.entered);
       const targetPlayerId = pendingPlayer ? pendingPlayer.id : activeSession.players[0].id;
 
@@ -285,7 +403,6 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const fullPenaltyValue = activeSession?.gameConfig.fullPenaltyValue || STANDARD_FULL_VALUE;
 
       let newStr: string;
-      // If score was FULL, tapping a digit starts a new number (e.g. entering 89 after FULL -> 8 -> 89; 234 after FULL -> 2 -> 23 -> 234)
       if (activeScoreType === 'full' || baseScoreInput === 0) {
         newStr = digit;
       } else {
@@ -305,126 +422,173 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     backspaceScore: () => {
       const { baseScoreInput, activeSession } = get();
-      const fullPenaltyValue = activeSession?.gameConfig.fullPenaltyValue || STANDARD_FULL_VALUE;
       const str = baseScoreInput.toString();
-      const newVal = str.length > 1 ? parseInt(str.slice(0, -1), 10) : 0;
-      const scoreType = newVal === 0 ? 'dick' : newVal === fullPenaltyValue ? 'full' : 'custom';
+      const fullPenaltyValue = activeSession?.gameConfig.fullPenaltyValue || STANDARD_FULL_VALUE;
+
+      if (str.length <= 1) {
+        triggerHaptic('light');
+        set({
+          baseScoreInput: 0,
+          activeScoreType: 'dick'
+        });
+        return;
+      }
+
+      const truncated = parseInt(str.slice(0, -1), 10);
+      const finalVal = isNaN(truncated) ? 0 : truncated;
+      const scoreType = finalVal === 0 ? 'dick' : finalVal === fullPenaltyValue ? 'full' : 'custom';
 
       triggerHaptic('light');
       set({
-        baseScoreInput: newVal,
+        baseScoreInput: finalVal,
         activeScoreType: scoreType
       });
     },
 
     clearScore: () => {
       triggerHaptic('medium');
-      set({ baseScoreInput: 0, activeScoreType: 'dick' });
+      set({
+        baseScoreInput: 0,
+        activeScoreType: 'custom'
+      });
     },
 
     setDickScore: () => {
       triggerHaptic('medium');
-      set({ baseScoreInput: 0, activeScoreType: 'dick' });
+      set({
+        baseScoreInput: 0,
+        activeScoreType: 'dick'
+      });
     },
 
     setFullScore: () => {
-      const fullPenaltyValue = get().activeSession?.gameConfig.fullPenaltyValue || STANDARD_FULL_VALUE;
+      const fullPenalty = get().activeSession?.gameConfig.fullPenaltyValue || STANDARD_FULL_VALUE;
       triggerHaptic('heavy');
-      set({ baseScoreInput: fullPenaltyValue, activeScoreType: 'full' });
+      set({
+        baseScoreInput: fullPenalty,
+        activeScoreType: 'full'
+      });
     },
 
     confirmPlayerScore: () => {
-      const { activeSession, activeScoringPlayerId, baseScoreInput, activeScoreType } = get();
+      const {
+        activeSession,
+        activeScoringPlayerId,
+        baseScoreInput,
+        activeScoreType,
+        historySessions,
+        user
+      } = get();
+
       if (!activeSession || !activeScoringPlayerId) return;
 
-      const roundIdx = activeSession.currentRoundNumber - 1;
-      const currentRound = activeSession.rounds[roundIdx];
+      const roundIndex = activeSession.currentRoundNumber - 1;
+      const currentRound = activeSession.rounds[roundIndex];
       if (!currentRound) return;
 
-      const multiplier = currentRound.multiplier;
-      const finalScore = calculateRoundScore(baseScoreInput, multiplier);
+      const roundMultiplier = currentRound.multiplier || 1;
+      const calculatedRoundScore = calculateRoundScore(
+        baseScoreInput,
+        roundMultiplier,
+        activeScoreType,
+        activeSession.gameConfig.variant
+      );
+
+      const scoreEntry: RoundScore = {
+        playerId: activeScoringPlayerId,
+        baseScore: baseScoreInput,
+        multiplier: roundMultiplier,
+        finalScore: calculatedRoundScore,
+        scoreType: activeScoreType,
+        entered: true
+      };
 
       const updatedScores = {
         ...currentRound.scores,
-        [activeScoringPlayerId]: {
-          playerId: activeScoringPlayerId,
-          baseScore: baseScoreInput,
-          multiplier,
-          finalScore,
-          scoreType: activeScoreType,
-          entered: true
-        }
+        [activeScoringPlayerId]: scoreEntry
       };
 
-      const allPlayersEntered = activeSession.players.every(p => updatedScores[p.id]?.entered);
+      const allEntered = activeSession.players.every(
+        p => p.id === activeScoringPlayerId || updatedScores[p.id]?.entered
+      );
 
       const updatedRound: GameRound = {
         ...currentRound,
         scores: updatedScores,
-        isCompleted: allPlayersEntered
+        isCompleted: allEntered
       };
 
       const updatedRounds = [...activeSession.rounds];
-      updatedRounds[roundIdx] = updatedRound;
-
-      // Select next player in roster who still has pending score
-      const nextPendingPlayer = activeSession.players.find(p => !updatedScores[p.id]?.entered && p.id !== activeScoringPlayerId);
+      updatedRounds[roundIndex] = updatedRound;
 
       const updatedSession: GameSession = {
         ...activeSession,
         rounds: updatedRounds
       };
 
+      // Find next player needing score entry
+      const nextPlayer = activeSession.players.find(
+        p => p.id !== activeScoringPlayerId && !updatedScores[p.id]?.entered
+      );
+
+      const updatedHistory = historySessions.map(s =>
+        s.id === updatedSession.id ? updatedSession : s
+      );
+
+      StorageService.saveSessions(updatedHistory, user?.id);
+
       triggerHaptic('success');
+      set({
+        activeSession: updatedSession,
+        historySessions: updatedHistory,
+        activeScoringPlayerId: nextPlayer ? nextPlayer.id : activeScoringPlayerId,
+        baseScoreInput: nextPlayer && updatedScores[nextPlayer.id]
+          ? updatedScores[nextPlayer.id]!.baseScore
+          : 0,
+        activeScoreType: nextPlayer && updatedScores[nextPlayer.id]
+          ? updatedScores[nextPlayer.id]!.scoreType
+          : 'custom'
+      });
 
-      // Save to persistence
-      const history = get().historySessions.map(s => s.id === updatedSession.id ? updatedSession : s);
-      StorageService.saveSessions(history);
-
-      if (allPlayersEntered) {
-        // Round is complete!
-        set({
-          activeSession: updatedSession,
-          historySessions: history,
-          activeScoringPlayerId: null,
-          baseScoreInput: 0
-        });
-        get().completeRound();
-      } else {
-        set({
-          activeSession: updatedSession,
-          historySessions: history,
-          activeScoringPlayerId: nextPendingPlayer ? nextPendingPlayer.id : null,
-          baseScoreInput: 0,
-          activeScoreType: 'custom'
-        });
-      }
+      // Async write single score to persistence
+      persistenceRepository.sessions
+        .saveRoundScore(activeSession.id, activeSession.currentRoundNumber, activeScoringPlayerId, scoreEntry)
+        .catch(err => console.warn('[sessionStore] saveRoundScore cloud warning:', err));
     },
 
     completeRound: () => {
-      const { activeSession } = get();
+      const { activeSession, historySessions, user } = get();
       if (!activeSession) return;
 
       const currentRoundNum = activeSession.currentRoundNumber;
-      const totalRounds = activeSession.gameConfig.roundCount;
+      const currentRound = activeSession.rounds[currentRoundNum - 1];
 
-      if (currentRoundNum < totalRounds) {
+      // Verify all players entered score
+      const unentered = activeSession.players.filter(p => !currentRound?.scores[p.id]?.entered);
+      if (unentered.length > 0) {
+        get().showToast(`Waiting for scores: ${unentered.map(p => p.name).join(', ')}`);
+        return;
+      }
+
+      triggerHaptic('success');
+
+      if (currentRoundNum < activeSession.gameConfig.roundCount) {
         const nextRoundNum = currentRoundNum + 1;
         const updatedSession: GameSession = {
           ...activeSession,
           currentRoundNumber: nextRoundNum
         };
 
-        const history = get().historySessions.map(s => s.id === updatedSession.id ? updatedSession : s);
-        StorageService.saveSessions(history);
+        const updatedHistory = historySessions.map(s =>
+          s.id === updatedSession.id ? updatedSession : s
+        );
 
-        // Pick seat 1 as initial scoring player for the next round
-        const firstPlayerId = updatedSession.players[0]?.id || null;
+        StorageService.saveSessions(updatedHistory, user?.id);
 
         set({
           activeSession: updatedSession,
-          historySessions: history,
-          activeScoringPlayerId: firstPlayerId,
+          historySessions: updatedHistory,
+          activeScoringPlayerId: activeSession.players[0].id,
           baseScoreInput: 0,
           activeScoreType: 'custom'
         });
@@ -437,7 +601,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     finalizeSession: () => {
-      const { activeSession, historySessions, playerStats } = get();
+      const { activeSession, historySessions, playerStats, user } = get();
       if (!activeSession) return;
 
       const results: SessionResult[] = buildSessionResults(activeSession);
@@ -451,11 +615,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
         results
       };
 
-      StorageService.savePlayerStats(updatedStats);
-      StorageService.setActiveSessionId(null);
+      StorageService.savePlayerStats(updatedStats, user?.id);
+      StorageService.setActiveSessionId(null, user?.id);
 
       const updatedHistory = [finalizedSession, ...historySessions.filter(s => s.id !== finalizedSession.id)];
-      StorageService.saveSessions(updatedHistory);
+      StorageService.saveSessions(updatedHistory, user?.id);
 
       triggerHaptic('success');
       set({
@@ -470,14 +634,14 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     startRematch: () => {
-      const { activeSession, playersRoster } = get();
+      const { activeSession } = get();
       const variant = activeSession?.gameConfig.variant || '7s';
       get().selectVariant(variant);
       get().startNewSession();
     },
 
     settleTeaDuty: (sessionId?: string) => {
-      const { activeSession, historySessions, viewingHistoricalSessionId, selectedGameDetailsId } = get();
+      const { activeSession, historySessions, viewingHistoricalSessionId, selectedGameDetailsId, user } = get();
       const targetId = sessionId || selectedGameDetailsId || viewingHistoricalSessionId || activeSession?.id;
       if (!targetId) return;
 
@@ -488,7 +652,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         return s;
       });
 
-      StorageService.saveSessions(updatedHistory);
+      StorageService.saveSessions(updatedHistory, user?.id);
 
       const updatedActive = activeSession?.id === targetId
         ? { ...activeSession, teaSettled: !activeSession.teaSettled }
@@ -535,11 +699,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     addPhotoToSession: (sessionId, photoData) => {
-      const { historySessions, activeSession } = get();
+      const { historySessions, activeSession, user } = get();
       const photoId = `snap_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       const newPhoto: GamePhoto = {
         ...photoData,
         id: photoId,
+        userId: user ? user.id : undefined,
         sessionId,
         uploadedAt: new Date().toISOString(),
         likes: 0
@@ -552,7 +717,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       };
 
       const updatedHistory = historySessions.map(updateSessionPhotos);
-      StorageService.saveSessions(updatedHistory);
+      StorageService.saveSessions(updatedHistory, user?.id);
 
       const updatedActive = activeSession?.id === sessionId ? updateSessionPhotos(activeSession) : activeSession;
 
@@ -567,11 +732,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
       // Asynchronously upload to Supabase storage if cloud is active
       if (persistenceRepository.isCloudConnected()) {
         persistenceRepository.photos
-          .uploadPhoto(sessionId, photoId, newPhoto.storagePath, newPhoto.thumbnailUrl)
+          .uploadPhoto(sessionId, photoId, newPhoto.storagePath, newPhoto.thumbnailUrl, user?.id)
           .then(async (uploaded) => {
             newPhoto.storagePath = uploaded.storagePath;
             newPhoto.thumbnailUrl = uploaded.thumbnailUrl;
-            await persistenceRepository.photos.savePhotoMetadata(newPhoto);
+            await persistenceRepository.photos.savePhotoMetadata(newPhoto, user?.id);
 
             // Update session state with cloud storage URLs
             const patchHistory = get().historySessions.map(s => {
@@ -581,7 +746,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
                 photos: (s.photos || []).map(p => (p.id === photoId ? newPhoto : p))
               };
             });
-            StorageService.saveSessions(patchHistory);
+            StorageService.saveSessions(patchHistory, user?.id);
             const patchActive = get().activeSession?.id === sessionId
               ? {
                   ...get().activeSession!,
@@ -597,7 +762,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     deletePhotoFromSession: (sessionId, photoId) => {
-      const { historySessions, activeSession } = get();
+      const { historySessions, activeSession, user } = get();
       const targetSession = historySessions.find(s => s.id === sessionId) || activeSession;
       const targetPhoto = targetSession?.photos?.find(p => p.id === photoId);
 
@@ -610,11 +775,11 @@ export const useSessionStore = create<SessionState>((set, get) => {
       };
 
       const updatedHistory = historySessions.map(removePhoto);
-      StorageService.saveSessions(updatedHistory);
+      StorageService.saveSessions(updatedHistory, user?.id);
 
       const updatedActive = activeSession?.id === sessionId ? removePhoto(activeSession) : activeSession;
 
-      persistenceRepository.photos.deletePhoto(sessionId, photoId, targetPhoto?.storagePath).catch(err => {
+      persistenceRepository.photos.deletePhoto(sessionId, photoId, targetPhoto?.storagePath, user?.id).catch(err => {
         console.warn('[sessionStore] Cloud photo deletion failed', err);
       });
 
@@ -629,7 +794,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     togglePhotoLike: (photoId) => {
-      const { historySessions, activeSession } = get();
+      const { historySessions, activeSession, user } = get();
       const updateLike = (session: GameSession): GameSession => ({
         ...session,
         photos: (session.photos || []).map(p =>
@@ -638,7 +803,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       });
 
       const updatedHistory = historySessions.map(updateLike);
-      StorageService.saveSessions(updatedHistory);
+      StorageService.saveSessions(updatedHistory, user?.id);
       const updatedActive = activeSession ? updateLike(activeSession) : null;
       triggerHaptic('light');
 
@@ -685,6 +850,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
     toggleHaptics: () => {
       const next = !get().hapticsEnabled;
+      setHapticsEnabled(next);
       if (next) triggerHaptic('medium');
       set({ hapticsEnabled: next });
       get().showToast(next ? "Haptics Enabled" : "Haptics Muted");
@@ -700,26 +866,30 @@ export const useSessionStore = create<SessionState>((set, get) => {
     },
 
     initializePersistence: async () => {
-      if (persistenceRepository.isCloudConnected()) {
-        try {
-          const { sessions, players, stats } = await StorageService.syncFromPersistence();
-          const currentActiveId = StorageService.getActiveSessionId();
-          const activeSession = currentActiveId
-            ? sessions.find(s => s.id === currentActiveId && s.status === 'active') || null
-            : null;
+      const client = getSupabaseClient();
 
-          if (sessions.length > 0 || players.length > 0) {
-            set({
-              historySessions: sessions.length > 0 ? sessions : get().historySessions,
-              playersRoster: players.length > 0 ? players : get().playersRoster,
-              playerStats: Object.keys(stats).length > 0 ? stats : get().playerStats,
-              activeSession: activeSession ?? get().activeSession,
-              isCloudConnected: true
-            });
-          }
+      if (client) {
+        try {
+          // Listen to Supabase Auth state changes
+          client.auth.onAuthStateChange(async (_event, session) => {
+            const authUser = session?.user ?? null;
+            set({ user: authUser, authLoading: false });
+            await get().syncUserData(authUser?.id);
+          });
+
+          // Check current active session in Supabase Auth
+          const { data: authSessionData } = await client.auth.getSession();
+          const authUser = authSessionData.session?.user ?? null;
+          set({ user: authUser, authLoading: false });
+          await get().syncUserData(authUser?.id);
         } catch (err) {
-          console.warn('[sessionStore] Failed to initialize from cloud persistence:', err);
+          console.warn('[sessionStore] Auth initialization warning:', err);
+          set({ authLoading: false });
+          await get().syncUserData(undefined);
         }
+      } else {
+        set({ authLoading: false });
+        await get().syncUserData(undefined);
       }
     },
 

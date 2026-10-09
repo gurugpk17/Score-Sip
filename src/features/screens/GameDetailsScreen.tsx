@@ -43,7 +43,7 @@ export const GameDetailsScreen: React.FC = () => {
 
   const handleShareWhatsApp = () => {
     triggerHaptic('medium');
-    const text = `🃏 *${session.name}* (${session.gameConfig.name})\n🏆 Champion: ${winner?.playerName} (${winner?.totalScore} pts)\n🥈 Runner-Up: ${runnerUp?.playerName} (${runnerUp?.totalScore} pts)\n☕ Tea Duty: ${teaLoser?.playerName} (${teaLoser?.totalScore} pts)\n📸 Snaps: ${photos.length} captured.\n\nTracked on Rummy 7's!`;
+    const text = `🃏 *${session.name}* (${session.gameConfig.name})\n🏆 Champion: ${winner?.playerName} (${winner?.totalScore} pts)\n🥈 Runner-Up: ${runnerUp?.playerName} (${runnerUp?.totalScore} pts)\n☕ Tea Duty: ${teaLoser?.playerName} (${teaLoser?.totalScore} pts)\n📸 Snaps: ${photos.length} captured.\n\nTracked on Score & Sip!`;
     if (navigator.share) {
       navigator.share({ title: session.name, text }).catch(() => {});
     } else {
@@ -363,7 +363,7 @@ export const GameDetailsScreen: React.FC = () => {
         </div>
       </section>
 
-      {/* Cutting Chai Sponsor Card */}
+      {/* Tea Duty Sponsor Card */}
       {teaLoser && (
         <div className="bg-[#1c2028] border border-[#ff7a73]/30 rounded-2xl p-4 shadow-sm flex items-center justify-between mb-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -372,10 +372,10 @@ export const GameDetailsScreen: React.FC = () => {
             </div>
             <div className="flex flex-col min-w-0">
               <span className="font-headline font-bold text-xs text-[#dfe2ee]">
-                Cutting Chai Sponsor
+                Tea Duty Sponsor
               </span>
               <span className="font-body text-xs text-[#bbcabf] truncate">
-                {teaLoser.playerName} owes 5 cups & samosas
+                {teaLoser.playerName} • Last place finish
               </span>
             </div>
           </div>

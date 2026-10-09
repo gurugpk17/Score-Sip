@@ -12,6 +12,7 @@ export type Database = {
       players: {
         Row: {
           id: string;
+          user_id: string | null;
           name: string;
           seat_number: number;
           is_host: boolean;
@@ -23,6 +24,7 @@ export type Database = {
         };
         Insert: {
           id: string;
+          user_id?: string | null;
           name: string;
           seat_number?: number;
           is_host?: boolean;
@@ -34,6 +36,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          user_id?: string | null;
           name?: string;
           seat_number?: number;
           is_host?: boolean;
@@ -48,6 +51,7 @@ export type Database = {
       sessions: {
         Row: {
           id: string;
+          user_id: string | null;
           name: string;
           status: 'draft' | 'active' | 'completed';
           game_config: Json;
@@ -62,6 +66,7 @@ export type Database = {
         };
         Insert: {
           id: string;
+          user_id?: string | null;
           name: string;
           status?: 'draft' | 'active' | 'completed';
           game_config: Json;
@@ -76,6 +81,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          user_id?: string | null;
           name?: string;
           status?: 'draft' | 'active' | 'completed';
           game_config?: Json;
@@ -240,6 +246,7 @@ export type Database = {
       player_stats: {
         Row: {
           player_id: string;
+          user_id: string | null;
           player_name: string;
           sessions_played: number;
           wins: number;
@@ -254,6 +261,7 @@ export type Database = {
         };
         Insert: {
           player_id: string;
+          user_id?: string | null;
           player_name: string;
           sessions_played?: number;
           wins?: number;
@@ -268,6 +276,7 @@ export type Database = {
         };
         Update: {
           player_id?: string;
+          user_id?: string | null;
           player_name?: string;
           sessions_played?: number;
           wins?: number;
@@ -285,6 +294,7 @@ export type Database = {
       game_photos: {
         Row: {
           id: string;
+          user_id: string | null;
           session_id: string;
           game_name: string;
           session_name: string;
@@ -301,6 +311,7 @@ export type Database = {
         };
         Insert: {
           id: string;
+          user_id?: string | null;
           session_id: string;
           game_name?: string;
           session_name?: string;
@@ -317,6 +328,7 @@ export type Database = {
         };
         Update: {
           id?: string;
+          user_id?: string | null;
           session_id?: string;
           game_name?: string;
           session_name?: string;
