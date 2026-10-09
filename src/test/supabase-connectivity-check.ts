@@ -43,7 +43,7 @@ async function checkSupabaseConnection() {
 
   console.log('\nAttempting real read/write ping to Supabase...');
   try {
-    const { data, error } = await client.from('players').select('id, name').limit(1);
+    const { data, error } = await client.from('players').select('id, name, user_id').limit(1);
     if (error) {
       console.error('[PING FAILED]', error.message);
       return;

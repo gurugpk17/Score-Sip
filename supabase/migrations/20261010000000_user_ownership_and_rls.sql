@@ -3,6 +3,7 @@
 -- Migration: 20261010000000_user_ownership_and_rls.sql
 -- Description: Scopes players, sessions, statistics, and photos to auth.users.id
 --              Enforces strict multi-tenant Row Level Security (RLS) isolation.
+--              Fully idempotent: safe to execute multiple times.
 -- ==============================================================================
 
 -- 1. ADD USER_ID TO ROOT ENTITIES
@@ -18,7 +19,18 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user_status ON sessions(user_id, status)
 CREATE INDEX IF NOT EXISTS idx_player_stats_user_id ON player_stats(user_id);
 CREATE INDEX IF NOT EXISTS idx_game_photos_user_id ON game_photos(user_id);
 
--- 3. DROP LEGACY OPEN "ALLOW_ALL" POLICIES
+-- 3. ENSURE ROW LEVEL SECURITY IS ENABLED
+ALTER TABLE players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_players ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rounds ENABLE ROW LEVEL SECURITY;
+ALTER TABLE round_scores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE player_stats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE game_photos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
+
+-- 4. DROP LEGACY OPEN "ALLOW_ALL" POLICIES
 DROP POLICY IF EXISTS "allow_all_players_select" ON players;
 DROP POLICY IF EXISTS "allow_all_players_insert" ON players;
 DROP POLICY IF EXISTS "allow_all_players_update" ON players;
@@ -64,45 +76,55 @@ DROP POLICY IF EXISTS "allow_all_app_settings_insert" ON app_settings;
 DROP POLICY IF EXISTS "allow_all_app_settings_update" ON app_settings;
 DROP POLICY IF EXISTS "allow_all_app_settings_delete" ON app_settings;
 
--- 4. STRICT ROW LEVEL SECURITY POLICIES (AUTHENTICATED USER ISOLATION)
+-- 5. STRICT ROW LEVEL SECURITY POLICIES (AUTHENTICATED USER ISOLATION)
+-- Preceded by DROP POLICY IF EXISTS to allow safe, idempotent execution.
 
 -- PLAYERS: Owned directly by auth.uid()
+DROP POLICY IF EXISTS "user_players_select" ON players;
 CREATE POLICY "user_players_select" ON players
   FOR SELECT TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_players_insert" ON players;
 CREATE POLICY "user_players_insert" ON players
   FOR INSERT TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_players_update" ON players;
 CREATE POLICY "user_players_update" ON players
   FOR UPDATE TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_players_delete" ON players;
 CREATE POLICY "user_players_delete" ON players
   FOR DELETE TO authenticated
   USING (auth.uid() = user_id);
 
 -- SESSIONS: Owned directly by auth.uid()
+DROP POLICY IF EXISTS "user_sessions_select" ON sessions;
 CREATE POLICY "user_sessions_select" ON sessions
   FOR SELECT TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_sessions_insert" ON sessions;
 CREATE POLICY "user_sessions_insert" ON sessions
   FOR INSERT TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_sessions_update" ON sessions;
 CREATE POLICY "user_sessions_update" ON sessions
   FOR UPDATE TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_sessions_delete" ON sessions;
 CREATE POLICY "user_sessions_delete" ON sessions
   FOR DELETE TO authenticated
   USING (auth.uid() = user_id);
 
 -- SESSION_PLAYERS: Belongs to session owned by auth.uid()
+DROP POLICY IF EXISTS "user_session_players_select" ON session_players;
 CREATE POLICY "user_session_players_select" ON session_players
   FOR SELECT TO authenticated
   USING (EXISTS (
@@ -110,6 +132,7 @@ CREATE POLICY "user_session_players_select" ON session_players
     WHERE s.id = session_players.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_session_players_insert" ON session_players;
 CREATE POLICY "user_session_players_insert" ON session_players
   FOR INSERT TO authenticated
   WITH CHECK (EXISTS (
@@ -117,6 +140,7 @@ CREATE POLICY "user_session_players_insert" ON session_players
     WHERE s.id = session_players.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_session_players_update" ON session_players;
 CREATE POLICY "user_session_players_update" ON session_players
   FOR UPDATE TO authenticated
   USING (EXISTS (
@@ -128,6 +152,7 @@ CREATE POLICY "user_session_players_update" ON session_players
     WHERE s.id = session_players.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_session_players_delete" ON session_players;
 CREATE POLICY "user_session_players_delete" ON session_players
   FOR DELETE TO authenticated
   USING (EXISTS (
@@ -136,6 +161,7 @@ CREATE POLICY "user_session_players_delete" ON session_players
   ));
 
 -- ROUNDS: Belongs to session owned by auth.uid()
+DROP POLICY IF EXISTS "user_rounds_select" ON rounds;
 CREATE POLICY "user_rounds_select" ON rounds
   FOR SELECT TO authenticated
   USING (EXISTS (
@@ -143,6 +169,7 @@ CREATE POLICY "user_rounds_select" ON rounds
     WHERE s.id = rounds.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_rounds_insert" ON rounds;
 CREATE POLICY "user_rounds_insert" ON rounds
   FOR INSERT TO authenticated
   WITH CHECK (EXISTS (
@@ -150,6 +177,7 @@ CREATE POLICY "user_rounds_insert" ON rounds
     WHERE s.id = rounds.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_rounds_update" ON rounds;
 CREATE POLICY "user_rounds_update" ON rounds
   FOR UPDATE TO authenticated
   USING (EXISTS (
@@ -161,6 +189,7 @@ CREATE POLICY "user_rounds_update" ON rounds
     WHERE s.id = rounds.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_rounds_delete" ON rounds;
 CREATE POLICY "user_rounds_delete" ON rounds
   FOR DELETE TO authenticated
   USING (EXISTS (
@@ -169,6 +198,7 @@ CREATE POLICY "user_rounds_delete" ON rounds
   ));
 
 -- ROUND_SCORES: Belongs to session owned by auth.uid()
+DROP POLICY IF EXISTS "user_round_scores_select" ON round_scores;
 CREATE POLICY "user_round_scores_select" ON round_scores
   FOR SELECT TO authenticated
   USING (EXISTS (
@@ -176,6 +206,7 @@ CREATE POLICY "user_round_scores_select" ON round_scores
     WHERE s.id = round_scores.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_round_scores_insert" ON round_scores;
 CREATE POLICY "user_round_scores_insert" ON round_scores
   FOR INSERT TO authenticated
   WITH CHECK (EXISTS (
@@ -183,6 +214,7 @@ CREATE POLICY "user_round_scores_insert" ON round_scores
     WHERE s.id = round_scores.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_round_scores_update" ON round_scores;
 CREATE POLICY "user_round_scores_update" ON round_scores
   FOR UPDATE TO authenticated
   USING (EXISTS (
@@ -194,6 +226,7 @@ CREATE POLICY "user_round_scores_update" ON round_scores
     WHERE s.id = round_scores.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_round_scores_delete" ON round_scores;
 CREATE POLICY "user_round_scores_delete" ON round_scores
   FOR DELETE TO authenticated
   USING (EXISTS (
@@ -202,6 +235,7 @@ CREATE POLICY "user_round_scores_delete" ON round_scores
   ));
 
 -- SESSION_RESULTS: Belongs to session owned by auth.uid()
+DROP POLICY IF EXISTS "user_session_results_select" ON session_results;
 CREATE POLICY "user_session_results_select" ON session_results
   FOR SELECT TO authenticated
   USING (EXISTS (
@@ -209,6 +243,7 @@ CREATE POLICY "user_session_results_select" ON session_results
     WHERE s.id = session_results.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_session_results_insert" ON session_results;
 CREATE POLICY "user_session_results_insert" ON session_results
   FOR INSERT TO authenticated
   WITH CHECK (EXISTS (
@@ -216,6 +251,7 @@ CREATE POLICY "user_session_results_insert" ON session_results
     WHERE s.id = session_results.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_session_results_update" ON session_results;
 CREATE POLICY "user_session_results_update" ON session_results
   FOR UPDATE TO authenticated
   USING (EXISTS (
@@ -227,6 +263,7 @@ CREATE POLICY "user_session_results_update" ON session_results
     WHERE s.id = session_results.session_id AND s.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "user_session_results_delete" ON session_results;
 CREATE POLICY "user_session_results_delete" ON session_results
   FOR DELETE TO authenticated
   USING (EXISTS (
@@ -235,48 +272,57 @@ CREATE POLICY "user_session_results_delete" ON session_results
   ));
 
 -- PLAYER_STATS: Owned directly by auth.uid()
+DROP POLICY IF EXISTS "user_player_stats_select" ON player_stats;
 CREATE POLICY "user_player_stats_select" ON player_stats
   FOR SELECT TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_player_stats_insert" ON player_stats;
 CREATE POLICY "user_player_stats_insert" ON player_stats
   FOR INSERT TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_player_stats_update" ON player_stats;
 CREATE POLICY "user_player_stats_update" ON player_stats
   FOR UPDATE TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_player_stats_delete" ON player_stats;
 CREATE POLICY "user_player_stats_delete" ON player_stats
   FOR DELETE TO authenticated
   USING (auth.uid() = user_id);
 
 -- GAME_PHOTOS: Owned directly by auth.uid()
+DROP POLICY IF EXISTS "user_game_photos_select" ON game_photos;
 CREATE POLICY "user_game_photos_select" ON game_photos
   FOR SELECT TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_game_photos_insert" ON game_photos;
 CREATE POLICY "user_game_photos_insert" ON game_photos
   FOR INSERT TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_game_photos_update" ON game_photos;
 CREATE POLICY "user_game_photos_update" ON game_photos
   FOR UPDATE TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "user_game_photos_delete" ON game_photos;
 CREATE POLICY "user_game_photos_delete" ON game_photos
   FOR DELETE TO authenticated
   USING (auth.uid() = user_id);
 
--- 5. STORAGE BUCKET RLS (GAME-SNAPS ISOLATION)
+-- 6. STORAGE BUCKET RLS (GAME-SNAPS ISOLATION)
 -- Objects are partitioned under `<user_id>/<session_id>/<filename>`
 DROP POLICY IF EXISTS "allow_public_read_game_snaps" ON storage.objects;
 DROP POLICY IF EXISTS "allow_anon_upload_game_snaps" ON storage.objects;
 DROP POLICY IF EXISTS "allow_anon_update_game_snaps" ON storage.objects;
 DROP POLICY IF EXISTS "allow_anon_delete_game_snaps" ON storage.objects;
 
+DROP POLICY IF EXISTS "user_read_game_snaps" ON storage.objects;
 CREATE POLICY "user_read_game_snaps"
 ON storage.objects FOR SELECT
 TO authenticated
@@ -285,6 +331,7 @@ USING (
   AND (storage.foldername(name))[1] = auth.uid()::text
 );
 
+DROP POLICY IF EXISTS "user_upload_game_snaps" ON storage.objects;
 CREATE POLICY "user_upload_game_snaps"
 ON storage.objects FOR INSERT
 TO authenticated
@@ -293,6 +340,7 @@ WITH CHECK (
   AND (storage.foldername(name))[1] = auth.uid()::text
 );
 
+DROP POLICY IF EXISTS "user_update_game_snaps" ON storage.objects;
 CREATE POLICY "user_update_game_snaps"
 ON storage.objects FOR UPDATE
 TO authenticated
@@ -305,6 +353,7 @@ WITH CHECK (
   AND (storage.foldername(name))[1] = auth.uid()::text
 );
 
+DROP POLICY IF EXISTS "user_delete_game_snaps" ON storage.objects;
 CREATE POLICY "user_delete_game_snaps"
 ON storage.objects FOR DELETE
 TO authenticated
