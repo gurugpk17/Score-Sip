@@ -1,6 +1,7 @@
 import { runAllScoringEngineTests } from '../domain/scoring/engine.test';
 import { runPersistenceTests } from './persistence.test';
 import { runUserIsolationTests } from './user-isolation.test';
+import { runV2GameplayTests } from './v2-gameplay-fixes.test';
 
 async function main() {
   console.log('====================================================');
@@ -52,12 +53,28 @@ async function main() {
 
   console.log(`\nUser Isolation Tests: ${isolationResults.length - isolationFailures} / ${isolationResults.length} passed.\n`);
 
-  const totalTests = scoringResults.length + persistenceResults.length + isolationResults.length;
+  console.log('--- RUNNING V2.0 GAMEPLAY, ACE & GUEST REGRESSION TESTS ---');
+  const v2Results = await runV2GameplayTests();
+  let v2Failures = 0;
+
+  for (const t of v2Results) {
+    if (t.passed) {
+      console.log(`  ✓ [PASS] ${t.title}`);
+    } else {
+      v2Failures++;
+      console.error(`  ✗ [FAIL] ${t.title} -> ${t.error}`);
+    }
+  }
+
+  console.log(`\nV2 Regression Tests: ${v2Results.length - v2Failures} / ${v2Results.length} passed.\n`);
+
+  const totalTests = scoringResults.length + persistenceResults.length + isolationResults.length + v2Results.length;
   const totalPassed =
     (scoringResults.length - domainFailures) +
     (persistenceResults.length - persistenceFailures) +
-    (isolationResults.length - isolationFailures);
-  const totalFailed = domainFailures + persistenceFailures + isolationFailures;
+    (isolationResults.length - isolationFailures) +
+    (v2Results.length - v2Failures);
+  const totalFailed = domainFailures + persistenceFailures + isolationFailures + v2Failures;
 
   console.log('====================================================');
   console.log(`  SUMMARY: ${totalPassed} / ${totalTests} TESTS PASSED`);

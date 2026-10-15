@@ -10,6 +10,7 @@ export const LiveScoreScreen: React.FC = () => {
     activeScoringPlayerId,
     selectScoringPlayer,
     setScreen,
+    completeRound,
     finalizeSession,
     showToast
   } = useSessionStore();
@@ -40,6 +41,12 @@ export const LiveScoreScreen: React.FC = () => {
   const roundIdx = currentRoundNum - 1;
   const currentRound = activeSession.rounds[roundIdx];
   const multiplier = currentRound?.multiplier || 1;
+
+  // Round entry progress
+  const enteredPlayers = activeSession.players.filter(p => currentRound?.scores[p.id]?.entered);
+  const enteredCount = enteredPlayers.length;
+  const allPlayersEntered = enteredCount === activeSession.players.length;
+  const firstPendingPlayer = activeSession.players.find(p => !currentRound?.scores[p.id]?.entered);
 
   // Calculate live cumulative standings up to current state
   const sessionTotals = calculateSessionTotals(activeSession);
@@ -304,6 +311,44 @@ export const LiveScoreScreen: React.FC = () => {
               );
             })}
           </div>
+
+          {/* Round Complete Advance Banner (Priority 1) */}
+          {allPlayersEntered && (
+            <div className="rounded-2xl p-4 bg-[var(--brand-primary-bg)] border-2 border-[var(--brand-primary)] shadow-md flex flex-col gap-2.5 mb-1 transition-all">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[20px] text-[var(--brand-primary)]">check_circle</span>
+                  <span className="font-headline font-bold text-sm text-[var(--text-primary)]">
+                    Round {currentRoundNum} Complete!
+                  </span>
+                </div>
+                <span className="font-headline text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--brand-primary)] text-[var(--brand-on-primary)]">
+                  All {activeSession.players.length} Entered
+                </span>
+              </div>
+              <p className="font-body text-xs text-[var(--text-secondary)]">
+                {currentRoundNum < totalRounds
+                  ? `All player scores recorded for Round ${currentRoundNum}. Ready to advance to Round ${currentRoundNum + 1} of ${totalRounds}.`
+                  : 'Final round scores recorded! Ready to crown the champion and calculate tea duties.'}
+              </p>
+              <button
+                onClick={() => {
+                  triggerHaptic('success');
+                  completeRound();
+                }}
+                className="w-full h-11 rounded-xl bg-[var(--brand-primary)] text-[var(--brand-on-primary)] font-headline font-bold text-xs uppercase tracking-wide flex items-center justify-center gap-2 shadow-sm active:scale-98 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {currentRoundNum < totalRounds ? 'arrow_forward' : 'emoji_events'}
+                </span>
+                <span>
+                  {currentRoundNum < totalRounds
+                    ? `Save & Advance to Round ${currentRoundNum + 1}`
+                    : 'Finalize Match & Crown Champion 👑'}
+                </span>
+              </button>
+            </div>
+          )}
 
           {/* Interactive Tactile Score Pad */}
           <TactileScorePad />
@@ -572,21 +617,47 @@ export const LiveScoreScreen: React.FC = () => {
                 triggerHaptic('selection');
                 setActiveTab('entry');
               }}
-              className="flex-1 h-13 rounded-xl bg-[#4edea3] hover:bg-[#6ffbbe] text-[#003824] flex items-center justify-center gap-1.5 font-headline font-bold text-sm tracking-wide shadow-[0_4px_25px_rgba(78,222,163,0.35)] active:scale-[0.97] transition-all cursor-pointer"
+              className="flex-1 h-13 rounded-xl bg-[var(--brand-primary)] text-[var(--brand-on-primary)] flex items-center justify-center gap-1.5 font-headline font-bold text-sm tracking-wide shadow-md active:scale-[0.97] transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[20px]">add_circle</span>
               <span>Enter Round {currentRoundNum} Scores</span>
             </button>
+          ) : allPlayersEntered ? (
+            currentRoundNum < totalRounds ? (
+              <button
+                onClick={() => {
+                  triggerHaptic('success');
+                  completeRound();
+                }}
+                className="flex-1 h-13 rounded-xl bg-[var(--brand-primary)] text-[var(--brand-on-primary)] flex items-center justify-center gap-1.5 font-headline font-bold text-sm tracking-wide shadow-lg active:scale-[0.97] transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+                <span>Complete Round {currentRoundNum} &amp; Start R{currentRoundNum + 1}</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  triggerHaptic('success');
+                  completeRound();
+                }}
+                className="flex-1 h-13 rounded-xl bg-[var(--brand-accent)] text-[var(--brand-on-accent)] flex items-center justify-center gap-1.5 font-headline font-bold text-sm tracking-wide shadow-lg active:scale-[0.97] transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">emoji_events</span>
+                <span>Finalize Match &amp; Crown Champion 👑</span>
+              </button>
+            )
           ) : (
             <button
               onClick={() => {
-                triggerHaptic('medium');
-                finalizeSession();
+                triggerHaptic('selection');
+                if (firstPendingPlayer) {
+                  selectScoringPlayer(firstPendingPlayer.id);
+                }
               }}
-              className="flex-1 h-13 rounded-xl bg-[#ffb95f] hover:bg-[#ffdcb8] text-[#2a1700] flex items-center justify-center gap-1.5 font-headline font-bold text-sm tracking-wide shadow-[0_4px_25px_rgba(255,185,95,0.35)] active:scale-[0.97] transition-all cursor-pointer"
+              className="flex-1 h-13 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex items-center justify-center gap-1.5 font-headline font-bold text-xs tracking-wide shadow-sm active:scale-[0.97] transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[20px]">check_circle</span>
-              <span>Finalize & Reveal Winner</span>
+              <span className="material-symbols-outlined text-[18px] text-[var(--brand-accent)]">pending</span>
+              <span>Round {currentRoundNum}: {enteredCount}/{activeSession.players.length} Entered ({firstPendingPlayer?.name || 'Next'})</span>
             </button>
           )}
         </div>

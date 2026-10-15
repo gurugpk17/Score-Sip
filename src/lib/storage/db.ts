@@ -88,52 +88,37 @@ export async function compressImageFile(
 }
 
 import { getUserStorageKey } from '../repositories/localStorageRepo';
+import { GuestStorageService } from './guestStorage';
 
 export class StorageService {
   static getSessions(userId?: string): GameSession[] {
+    const isGuest = !userId || userId === 'guest';
+    if (isGuest) {
+      return GuestStorageService.getGuestSessions();
+    }
+
     try {
       const key = getUserStorageKey('sessions', userId);
       const raw = localStorage.getItem(key);
-      if (!raw) {
-        if (userId) {
-          return [];
-        }
-        this.saveSessions([INITIAL_COMPLETED_SESSION, SECOND_COMPLETED_SESSION]);
-        return [INITIAL_COMPLETED_SESSION, SECOND_COMPLETED_SESSION];
-      }
-      const parsed: GameSession[] = JSON.parse(raw);
-      if (!userId) {
-        let changed = false;
-        const merged = parsed.map(s => {
-          if (s.id === INITIAL_COMPLETED_SESSION.id && (!s.photos || s.photos.length === 0)) {
-            changed = true;
-            return { ...s, photos: INITIAL_COMPLETED_SESSION.photos };
-          }
-          return s;
-        });
-
-        if (!merged.some(s => s.id === SECOND_COMPLETED_SESSION.id)) {
-          merged.push(SECOND_COMPLETED_SESSION);
-          changed = true;
-        }
-
-        if (changed) {
-          this.saveSessions(merged);
-        }
-        return merged;
-      }
-      return parsed;
+      if (!raw) return [];
+      return JSON.parse(raw);
     } catch {
-      return userId ? [] : [INITIAL_COMPLETED_SESSION, SECOND_COMPLETED_SESSION];
+      return [];
     }
   }
 
   static saveSessions(sessions: GameSession[], userId?: string): void {
+    const isGuest = !userId || userId === 'guest';
+    if (isGuest) {
+      GuestStorageService.saveGuestSessions(sessions);
+      return;
+    }
+
     try {
       const key = getUserStorageKey('sessions', userId);
       localStorage.setItem(key, JSON.stringify(sessions));
     } catch (e) {
-      console.warn('Storage saveSessions failed', e);
+      console.warn('[StorageService] saveSessions quota warning:', e);
     }
     persistenceRepository.sessions.saveSessions(sessions, userId).catch(e => {
       console.warn('[StorageService] persistence saveSessions failed', e);
@@ -141,20 +126,28 @@ export class StorageService {
   }
 
   static getActiveSessionId(userId?: string): string | null {
+    const isGuest = !userId || userId === 'guest';
+    if (isGuest) {
+      return GuestStorageService.getGuestActiveSessionId();
+    }
+
     try {
-      if (userId) {
-        const sessions = this.getSessions(userId);
-        const active = sessions.find(s => s.status === 'active');
-        if (active) return active.id;
-        return localStorage.getItem(getUserStorageKey('active_session_id', userId));
-      }
-      return localStorage.getItem(STORAGE_KEYS.ACTIVE_SESSION_ID);
+      const sessions = this.getSessions(userId);
+      const active = sessions.find(s => s.status === 'active');
+      if (active) return active.id;
+      return localStorage.getItem(getUserStorageKey('active_session_id', userId));
     } catch {
       return null;
     }
   }
 
   static setActiveSessionId(id: string | null, userId?: string): void {
+    const isGuest = !userId || userId === 'guest';
+    if (isGuest) {
+      GuestStorageService.saveGuestActiveSessionId(id);
+      return;
+    }
+
     try {
       const key = getUserStorageKey('active_session_id', userId);
       if (id) {
@@ -163,7 +156,7 @@ export class StorageService {
         localStorage.removeItem(key);
       }
     } catch (e) {
-      console.warn('Storage setActiveSessionId failed', e);
+      console.warn('[StorageService] setActiveSessionId failed', e);
     }
     persistenceRepository.sessions.setActiveSessionId(id, userId).catch(e => {
       console.warn('[StorageService] persistence setActiveSessionId failed', e);
@@ -171,28 +164,33 @@ export class StorageService {
   }
 
   static getPlayers(userId?: string): Player[] {
+    const isGuest = !userId || userId === 'guest';
+    if (isGuest) {
+      return GuestStorageService.getGuestPlayers();
+    }
+
     try {
       const key = getUserStorageKey('players', userId);
       const raw = localStorage.getItem(key);
-      if (!raw) {
-        if (userId) {
-          return [];
-        }
-        this.savePlayers(INITIAL_PLAYERS);
-        return INITIAL_PLAYERS;
-      }
+      if (!raw) return [];
       return JSON.parse(raw);
     } catch {
-      return userId ? [] : INITIAL_PLAYERS;
+      return [];
     }
   }
 
   static savePlayers(players: Player[], userId?: string): void {
+    const isGuest = !userId || userId === 'guest';
+    if (isGuest) {
+      GuestStorageService.saveGuestPlayers(players);
+      return;
+    }
+
     try {
       const key = getUserStorageKey('players', userId);
       localStorage.setItem(key, JSON.stringify(players));
     } catch (e) {
-      console.warn('Storage savePlayers failed', e);
+      console.warn('[StorageService] savePlayers failed', e);
     }
     persistenceRepository.players.savePlayers(players, userId).catch(e => {
       console.warn('[StorageService] persistence savePlayers failed', e);
@@ -200,28 +198,33 @@ export class StorageService {
   }
 
   static getPlayerStats(userId?: string): Record<string, PlayerStats> {
+    const isGuest = !userId || userId === 'guest';
+    if (isGuest) {
+      return GuestStorageService.getGuestStats();
+    }
+
     try {
       const key = getUserStorageKey('stats', userId);
       const raw = localStorage.getItem(key);
-      if (!raw) {
-        if (userId) {
-          return {};
-        }
-        this.savePlayerStats(INITIAL_STATS);
-        return INITIAL_STATS;
-      }
+      if (!raw) return {};
       return JSON.parse(raw);
     } catch {
-      return userId ? {} : INITIAL_STATS;
+      return {};
     }
   }
 
   static savePlayerStats(stats: Record<string, PlayerStats>, userId?: string): void {
+    const isGuest = !userId || userId === 'guest';
+    if (isGuest) {
+      GuestStorageService.saveGuestStats(stats);
+      return;
+    }
+
     try {
       const key = getUserStorageKey('stats', userId);
       localStorage.setItem(key, JSON.stringify(stats));
     } catch (e) {
-      console.warn('Storage savePlayerStats failed', e);
+      console.warn('[StorageService] savePlayerStats failed', e);
     }
     persistenceRepository.stats.savePlayerStats(stats, userId).catch(e => {
       console.warn('[StorageService] persistence savePlayerStats failed', e);
@@ -233,10 +236,11 @@ export class StorageService {
     players: Player[];
     stats: Record<string, PlayerStats>;
   }> {
+    const effectiveUser = userId || 'guest';
     const [sessions, players, stats] = await Promise.all([
-      persistenceRepository.sessions.getSessions(userId),
-      persistenceRepository.players.getPlayers(userId),
-      persistenceRepository.stats.getPlayerStats(userId)
+      persistenceRepository.sessions.getSessions(effectiveUser),
+      persistenceRepository.players.getPlayers(effectiveUser),
+      persistenceRepository.stats.getPlayerStats(effectiveUser)
     ]);
     return { sessions, players, stats };
   }

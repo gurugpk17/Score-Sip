@@ -16,12 +16,33 @@ import { PhotoViewerModal } from './components/modals/PhotoViewerModal';
 import { DeleteSnapModal } from './components/modals/DeleteSnapModal';
 import { AddPhotoModal } from './components/modals/AddPhotoModal';
 
+import { GuestStorageService } from './lib/storage/guestStorage';
+
 export default function App() {
   const { currentScreen, setScreen, activeSession, initializePersistence } = useSessionStore();
 
   useEffect(() => {
+    // Check and purge expired guest storage (72h TTL) safely on app startup
+    GuestStorageService.isGuestExpired();
     initializePersistence();
   }, [initializePersistence]);
+
+  // Priority 5: Warn beforeunload only when active gameplay has unconfirmed/unsaved scores
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (activeSession && activeSession.status === 'active') {
+        const currentRound = activeSession.rounds[activeSession.currentRoundNumber - 1];
+        const hasUnconfirmedRound = currentRound && !currentRound.isCompleted;
+        if (hasUnconfirmedRound) {
+          e.preventDefault();
+          e.returnValue = '';
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [activeSession]);
 
   const getHeaderProps = () => {
     switch (currentScreen) {

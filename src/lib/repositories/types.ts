@@ -26,7 +26,8 @@ export interface ISessionRepository {
     sessionId: string,
     roundNumber: number,
     playerId: string,
-    score: RoundScore
+    score: RoundScore,
+    userId?: string
   ): Promise<void>;
   finalizeSession(session: GameSession, results: SessionResult[]): Promise<void>;
 }

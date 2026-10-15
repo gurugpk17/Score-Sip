@@ -2,72 +2,88 @@
 
 :root {
   /* DARK THEME TOKENS (Default) */
-  --bg-app: #0f131c;
-  --bg-surface: #141824;
-  --bg-card: #1c2028;
-  --bg-card-hover: #262a33;
-  --bg-elevated: #262a33;
-  --bg-muted: #181c24;
-  --bg-input: #262a33;
+  --bg-app: #0c1017; /* charcoal/green-black app canvas */
+  --bg-surface: #121720;
+  --bg-card: #181d28; /* clearly elevated dark cards */
+  --bg-card-hover: #222938;
+  --bg-elevated: #222938;
+  --bg-muted: #141923;
+  --bg-input: #1b212c;
 
-  --text-primary: #dfe2ee;
-  --text-secondary: #bbcabf;
+  --text-primary: #dfe2ee; /* readable off-white */
+  --text-secondary: #bbcabf; /* muted sage secondary text */
   --text-muted: #86948a;
 
+  --primary-action: #4edea3; /* emerald teal for primary actions */
+  --primary-pressed: #37b781;
   --brand-primary: #4edea3;
   --brand-primary-bg: rgba(78, 222, 163, 0.15);
   --brand-on-primary: #003824;
 
-  --brand-accent: #ffb95f;
+  --brand-accent: #ffb95f; /* muted amber/gold for winners */
   --brand-accent-bg: rgba(255, 185, 95, 0.15);
   --brand-on-accent: #2a1700;
 
+  --color-safe-bg: rgba(78, 222, 163, 0.15);
+  --color-safe-text: #4edea3;
+
+  --color-tea-duty: #ff7a73; /* distinct, tasteful terracotta accent for tea duty */
+  --color-tea-duty-bg: rgba(255, 122, 115, 0.15);
   --color-danger: #ff7a73;
   --color-danger-bg: rgba(255, 122, 115, 0.15);
   --color-danger-text: #ffb4ab;
 
+  --focus-ring: #4edea3;
   --border-subtle: rgba(60, 74, 66, 0.4);
   --border-card: rgba(60, 74, 66, 0.5);
   --border-highlight: rgba(78, 222, 163, 0.35);
 
-  --nav-bg: rgba(10, 14, 22, 0.94);
-  --header-bg: rgba(10, 14, 22, 0.90);
+  --nav-bg: rgba(12, 16, 23, 0.94);
+  --header-bg: rgba(12, 16, 23, 0.90);
   --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 html.light {
-  /* LIGHT THEME TOKENS */
-  --bg-app: #f7f6f2;
-  --bg-surface: #ffffff;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f3f1ea;
-  --bg-elevated: #f4f2eb;
-  --bg-muted: #ece9e0;
-  --bg-input: #f0ede4;
+  /* LIGHT THEME TOKENS (Priority 3) */
+  --bg-app: #F7F5EF; /* warm ivory main background */
+  --bg-surface: #FFFFFF;
+  --bg-card: #FFFFFF; /* cards and modal surfaces */
+  --bg-card-hover: #FCFAF5; /* hovered or selected card surfaces */
+  --bg-elevated: #FCFAF5;
+  --bg-muted: #F0EDE4;
+  --bg-input: #FFFFFF;
 
-  --text-primary: #18221d;
-  --text-secondary: #4b5a51;
-  --text-muted: #718177;
+  --text-primary: #202F2B; /* main text and headings */
+  --text-secondary: #62706A; /* secondary text */
+  --text-muted: #98A39E; /* muted and disabled elements */
 
-  --brand-primary: #0f6344;
-  --brand-primary-bg: rgba(15, 99, 68, 0.12);
-  --brand-on-primary: #ffffff;
+  --primary-action: #176B60; /* forest teal */
+  --primary-pressed: #115249; /* pressed primary action */
+  --brand-primary: #176B60;
+  --brand-primary-bg: rgba(23, 107, 96, 0.12);
+  --brand-on-primary: #FFFFFF;
 
-  --brand-accent: #b57c14;
-  --brand-accent-bg: rgba(181, 124, 20, 0.12);
-  --brand-on-accent: #ffffff;
+  --brand-accent: #C5A15A; /* winner and trophy accent */
+  --brand-accent-bg: #F4EBD9; /* winner background */
+  --brand-on-accent: #2F2405;
 
-  --color-danger: #c93033;
-  --color-danger-bg: rgba(201, 48, 51, 0.12);
-  --color-danger-text: #961b1e;
+  --color-safe-bg: #E3EFE8; /* Safe/DICK zero-point background */
+  --color-safe-text: #176B60;
 
-  --border-subtle: rgba(0, 0, 0, 0.08);
-  --border-card: rgba(0, 0, 0, 0.12);
-  --border-highlight: rgba(15, 99, 68, 0.3);
+  --color-tea-duty: #C2593F; /* tea-duty accent */
+  --color-tea-duty-bg: #FDECE7; /* tea-duty background */
+  --color-danger: #C2593F;
+  --color-danger-bg: #FDECE7;
+  --color-danger-text: #962812;
 
-  --nav-bg: rgba(255, 255, 255, 0.96);
-  --header-bg: rgba(255, 255, 255, 0.92);
-  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --focus-ring: #176B60;
+  --border-subtle: #E5E1D7; /* borders and dividers */
+  --border-card: #E5E1D7;
+  --border-highlight: #176B60;
+
+  --nav-bg: rgba(247, 245, 239, 0.96);
+  --header-bg: rgba(247, 245, 239, 0.92);
+  --shadow-card: 0 2px 14px rgba(32, 47, 43, 0.05);
 }
 
 @theme {

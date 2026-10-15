@@ -14,6 +14,122 @@ export function calculateAceScore(position: number): number {
   return (position - 1) * 10;
 }
 
+export interface AcePositionOption {
+  position: number;
+  points: number;
+  isAvailable: boolean;
+  takenByPlayerId?: string;
+}
+
+/**
+ * Generate dynamic ACE finishing positions for any player count.
+ * Dynamic positions: 1 through playerCount (e.g. 4 -> 1..4, 9 -> 1..9, 11 -> 1..11).
+ * Points formula: (position - 1) * 10
+ */
+export function getAcePositionsForPlayerCount(playerCount: number): number[] {
+  const count = Math.max(1, playerCount);
+  return Array.from({ length: count }, (_, i) => i + 1);
+}
+
+/**
+ * Determine which ACE positions are available vs taken in a round.
+ * Uniqueness rule: Each position can belong to only one player per round.
+ */
+export function getAvailableAcePositions(
+  round: GameRound,
+  playerCount: number,
+  currentPlayerId?: string
+): AcePositionOption[] {
+  const positions = getAcePositionsForPlayerCount(playerCount);
+  
+  // Map score to player who claimed it in this round
+  const scoreClaimants: Record<number, string> = {};
+  for (const [pId, score] of Object.entries(round.scores || {})) {
+    if (score && score.entered) {
+      scoreClaimants[score.baseScore] = pId;
+    }
+  }
+
+  return positions.map(pos => {
+    const points = calculateAceScore(pos);
+    const claimedBy = scoreClaimants[points];
+    const isCurrentPlayerClaim = Boolean(currentPlayerId && claimedBy === currentPlayerId);
+    const isAvailable = !claimedBy || isCurrentPlayerClaim;
+
+    return {
+      position: pos,
+      points,
+      isAvailable,
+      takenByPlayerId: claimedBy
+    };
+  });
+}
+
+/**
+ * Validates that an ACE round has all unique positions from 1 to N.
+ */
+export function validateAceRound(
+  round: GameRound,
+  playerIds: string[]
+): { isValid: boolean; error?: string } {
+  if (playerIds.length === 0) {
+    return { isValid: false, error: 'No players in game' };
+  }
+
+  const enteredScores: number[] = [];
+  for (const pId of playerIds) {
+    const score = round.scores[pId];
+    if (!score || !score.entered) {
+      return { isValid: false, error: 'Every player must select a finishing position.' };
+    }
+    enteredScores.push(score.baseScore);
+  }
+
+  // Check uniqueness
+  const uniqueScores = new Set(enteredScores);
+  if (uniqueScores.size !== playerIds.length) {
+    return { isValid: false, error: 'Each ACE finishing position must be unique. No duplicate positions allowed.' };
+  }
+
+  // Check valid positions
+  const expectedScores = new Set(
+    getAcePositionsForPlayerCount(playerIds.length).map(pos => calculateAceScore(pos))
+  );
+  for (const s of enteredScores) {
+    if (!expectedScores.has(s)) {
+      return { isValid: false, error: `Invalid position score: ${s}` };
+    }
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * General round validator for all game variants.
+ */
+export function validateRound(
+  round: GameRound,
+  players: { id: string; name: string }[],
+  variant: string
+): { isValid: boolean; error?: string } {
+  const playerIds = players.map(p => p.id);
+
+  if (variant === 'ace') {
+    return validateAceRound(round, playerIds);
+  }
+
+  // For Rummy variants: all players must have an entered score
+  const missing = players.filter(p => !round.scores[p.id]?.entered);
+  if (missing.length > 0) {
+    return {
+      isValid: false,
+      error: `Waiting for scores: ${missing.map(p => p.name).join(', ')}`
+    };
+  }
+
+  return { isValid: true };
+}
+
 /**
  * Round score calculation for Rummy variants:
  * finalRoundScore = baseScore * multiplier

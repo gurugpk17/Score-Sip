@@ -19,6 +19,7 @@ import {
   SECOND_COMPLETED_SESSION
 } from '../storage/seedData';
 import { updatePlayerStatistics } from '../../domain/scoring/engine';
+import { GuestStorageService, GUEST_STORAGE_KEYS } from '../storage/guestStorage';
 
 const STORAGE_KEYS = {
   SESSIONS: 'rummy7s_sessions_v1',
@@ -28,6 +29,13 @@ const STORAGE_KEYS = {
 };
 
 export function getUserStorageKey(baseKey: string, userId?: string): string {
+  if (userId === 'guest') {
+    if (baseKey === 'sessions') return GUEST_STORAGE_KEYS.SESSIONS;
+    if (baseKey === 'players') return GUEST_STORAGE_KEYS.PLAYERS;
+    if (baseKey === 'stats') return GUEST_STORAGE_KEYS.STATS;
+    if (baseKey === 'active_session_id') return GUEST_STORAGE_KEYS.ACTIVE_SESSION_ID;
+    return `score_sip_guest_${baseKey}`;
+  }
   if (userId) {
     return `score_sip_${baseKey}_${userId}`;
   }
@@ -52,6 +60,10 @@ function getStorage(): SimpleStorage | null {
 
 export class LocalStoragePlayerRepository implements IPlayerRepository {
   async getPlayers(userId?: string): Promise<Player[]> {
+    if (userId === 'guest') {
+      return GuestStorageService.getGuestPlayers();
+    }
+
     const storage = getStorage();
     if (!storage) return userId ? [] : INITIAL_PLAYERS;
 
@@ -59,10 +71,7 @@ export class LocalStoragePlayerRepository implements IPlayerRepository {
       const key = getUserStorageKey('players', userId);
       const raw = storage.getItem(key);
       if (!raw) {
-        if (userId) {
-          // Fresh user account starts with 0 players
-          return [];
-        }
+        if (userId) return [];
         await this.savePlayers(INITIAL_PLAYERS);
         return INITIAL_PLAYERS;
       }
@@ -73,6 +82,11 @@ export class LocalStoragePlayerRepository implements IPlayerRepository {
   }
 
   async savePlayers(players: Player[], userId?: string): Promise<void> {
+    if (userId === 'guest') {
+      GuestStorageService.saveGuestPlayers(players);
+      return;
+    }
+
     const storage = getStorage();
     if (!storage) return;
 
@@ -104,6 +118,10 @@ export class LocalStoragePlayerRepository implements IPlayerRepository {
 
 export class LocalStorageSessionRepository implements ISessionRepository {
   async getSessions(userId?: string): Promise<GameSession[]> {
+    if (userId === 'guest') {
+      return GuestStorageService.getGuestSessions();
+    }
+
     const storage = getStorage();
     if (!storage) return userId ? [] : [INITIAL_COMPLETED_SESSION, SECOND_COMPLETED_SESSION];
 
@@ -111,9 +129,7 @@ export class LocalStorageSessionRepository implements ISessionRepository {
       const key = getUserStorageKey('sessions', userId);
       const raw = storage.getItem(key);
       if (!raw) {
-        if (userId) {
-          return [];
-        }
+        if (userId) return [];
         await this.saveSessions([INITIAL_COMPLETED_SESSION, SECOND_COMPLETED_SESSION]);
         return [INITIAL_COMPLETED_SESSION, SECOND_COMPLETED_SESSION];
       }
@@ -143,6 +159,11 @@ export class LocalStorageSessionRepository implements ISessionRepository {
   }
 
   async saveSessions(sessions: GameSession[], userId?: string): Promise<void> {
+    if (userId === 'guest') {
+      GuestStorageService.saveGuestSessions(sessions);
+      return;
+    }
+
     const storage = getStorage();
     if (!storage) return;
 
@@ -155,12 +176,15 @@ export class LocalStorageSessionRepository implements ISessionRepository {
   }
 
   async getActiveSessionId(userId?: string): Promise<string | null> {
+    if (userId === 'guest') {
+      return GuestStorageService.getGuestActiveSessionId();
+    }
+
     const storage = getStorage();
     if (!storage) return null;
 
     try {
       if (userId) {
-        // Query sessions directly for active status scoped to this user
         const sessions = await this.getSessions(userId);
         const active = sessions.find(s => s.status === 'active');
         if (active) return active.id;
@@ -173,11 +197,16 @@ export class LocalStorageSessionRepository implements ISessionRepository {
   }
 
   async setActiveSessionId(id: string | null, userId?: string): Promise<void> {
+    if (userId === 'guest') {
+      GuestStorageService.saveGuestActiveSessionId(id);
+      return;
+    }
+
     const storage = getStorage();
     if (!storage) return;
 
     try {
-      const key = getUserStorageKey('active_session_id', userId);
+      const key = userId ? getUserStorageKey('active_session_id', userId) : STORAGE_KEYS.ACTIVE_SESSION_ID;
       if (id) {
         storage.setItem(key, id);
       } else {
@@ -192,9 +221,10 @@ export class LocalStorageSessionRepository implements ISessionRepository {
     sessionId: string,
     roundNumber: number,
     playerId: string,
-    score: RoundScore
+    score: RoundScore,
+    userId?: string
   ): Promise<void> {
-    const sessions = await this.getSessions();
+    const sessions = await this.getSessions(userId);
     const session = sessions.find(s => s.id === sessionId);
     if (!session) return;
 
@@ -204,7 +234,7 @@ export class LocalStorageSessionRepository implements ISessionRepository {
       session.rounds[roundIdx].isCompleted = session.players.every(
         p => session.rounds[roundIdx].scores[p.id]?.entered
       );
-      await this.saveSession(session, session.userId);
+      await this.saveSession(session, userId || session.userId);
     }
   }
 
@@ -223,6 +253,10 @@ export class LocalStorageSessionRepository implements ISessionRepository {
 
 export class LocalStorageStatsRepository implements IStatsRepository {
   async getPlayerStats(userId?: string): Promise<Record<string, PlayerStats>> {
+    if (userId === 'guest') {
+      return GuestStorageService.getGuestStats();
+    }
+
     const storage = getStorage();
     if (!storage) return userId ? {} : INITIAL_STATS;
 
@@ -241,6 +275,11 @@ export class LocalStorageStatsRepository implements IStatsRepository {
   }
 
   async savePlayerStats(stats: Record<string, PlayerStats>, userId?: string): Promise<void> {
+    if (userId === 'guest') {
+      GuestStorageService.saveGuestStats(stats);
+      return;
+    }
+
     const storage = getStorage();
     if (!storage) return;
 

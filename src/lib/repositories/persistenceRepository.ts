@@ -186,12 +186,13 @@ export class PersistenceRepository implements IPersistenceRepository {
         sessionId: string,
         roundNumber: number,
         playerId: string,
-        score: RoundScore
+        score: RoundScore,
+        userId?: string
       ) => {
-        await this.localSessions.saveRoundScore(sessionId, roundNumber, playerId, score);
-        if (this.cloudConnected && this.supabaseSessions) {
+        await this.localSessions.saveRoundScore(sessionId, roundNumber, playerId, score, userId);
+        if (this.cloudConnected && this.supabaseSessions && userId !== 'guest') {
           try {
-            await this.supabaseSessions.saveRoundScore(sessionId, roundNumber, playerId, score);
+            await this.supabaseSessions.saveRoundScore(sessionId, roundNumber, playerId, score, userId);
           } catch (err) {
             console.warn('[Persistence] Cloud saveRoundScore failed', err);
           }

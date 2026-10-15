@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSessionStore } from '../session/sessionStore';
 import { triggerHaptic } from '../../lib/utils/haptics';
 import { BrandLogo } from '../../components/ui/BrandLogo';
@@ -7,6 +7,8 @@ import { CustomGameModal } from '../../components/modals/CustomGameModal';
 
 export const DashboardScreen: React.FC = () => {
   const {
+    user,
+    signInWithGoogle,
     activeSession,
     historySessions,
     setScreen,
@@ -18,7 +20,15 @@ export const DashboardScreen: React.FC = () => {
     setCustomGameOpen
   } = useSessionStore();
 
-  const latestCompletedSession = historySessions.find(s => s.status === 'completed') || historySessions[0];
+  const [guestNoticeDismissed, setGuestNoticeDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('score_sip_guest_notice_dismissed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const latestCompletedSession = historySessions.find(s => s.status === 'completed');
 
   const handleStartNewGame = () => {
     triggerHaptic('success');
@@ -50,8 +60,64 @@ export const DashboardScreen: React.FC = () => {
         </div>
       </div>
 
+      {/* Guest Mode Notice & Google Sign-In Prompt (Priority 5) */}
+      {!user && !guestNoticeDismissed && (
+        <div className="rounded-2xl p-4 bg-[var(--bg-card)] border border-[var(--border-card)] shadow-sm flex flex-col gap-3 transition-all relative">
+          <button
+            onClick={() => {
+              triggerHaptic('light');
+              setGuestNoticeDismissed(true);
+              try { localStorage.setItem('score_sip_guest_notice_dismissed', 'true'); } catch {}
+            }}
+            className="absolute top-3 right-3 text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 rounded-lg cursor-pointer"
+            title="Dismiss notice"
+          >
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+
+          <div className="flex items-start gap-3 pr-6">
+            <div className="w-9 h-9 rounded-xl bg-[var(--brand-primary-bg)] text-[var(--brand-primary)] flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[20px]">person_outline</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="font-headline font-bold text-xs uppercase tracking-wider text-[var(--brand-primary)]">
+                Playing as Guest
+              </span>
+              <p className="font-body text-xs text-[var(--text-secondary)] mt-0.5">
+                Matches are kept locally for 72 hours. Continue with Google to keep your history, stats, and photos permanently in the cloud.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={() => {
+                triggerHaptic('medium');
+                signInWithGoogle();
+              }}
+              className="flex-1 h-9 rounded-xl bg-[var(--brand-primary)] text-[var(--brand-on-primary)] font-headline font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-sm cursor-pointer"
+            >
+              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.761H12.545z"/>
+              </svg>
+              <span>Continue with Google</span>
+            </button>
+            <button
+              onClick={() => {
+                triggerHaptic('light');
+                setGuestNoticeDismissed(true);
+                try { localStorage.setItem('score_sip_guest_notice_dismissed', 'true'); } catch {}
+              }}
+              className="h-9 px-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-headline font-semibold text-xs active:scale-95 transition-all cursor-pointer"
+            >
+              Play as Guest
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Primary Action Buttons Hub */}
-      <div className="flex flex-col gap-3.5 pt-2">
+      <div className="flex flex-col gap-3.5 pt-1">
         {/* 1. Start New Game (Dominant Primary Button) */}
         <button
           onClick={handleStartNewGame}

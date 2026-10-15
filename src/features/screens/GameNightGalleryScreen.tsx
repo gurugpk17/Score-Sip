@@ -20,8 +20,8 @@ export const GameNightGalleryScreen: React.FC = () => {
 
   const totalSnapsCount = allPhotos.length;
   const totalTeasCount = historySessions.reduce((acc, s) => {
-    return acc + (s.results?.filter(r => r.isTeaDuty).length || 1);
-  }, 12);
+    return acc + (s.results?.filter(r => r.isTeaDuty).length || 0);
+  }, 0);
 
   // Group photos by session
   const filteredSessions = allSessions.filter(session => {
@@ -34,9 +34,9 @@ export const GameNightGalleryScreen: React.FC = () => {
     return true;
   });
 
-  const count7s = allPhotos.filter(p => p.gameName.includes('7s')).length || 10;
-  const count5s = allPhotos.filter(p => p.gameName.includes('5s')).length || 4;
-  const countAce = allPhotos.filter(p => p.gameName.includes('ACE')).length || 4;
+  const count7s = allPhotos.filter(p => p.gameName.toLowerCase().includes('7s')).length;
+  const count5s = allPhotos.filter(p => p.gameName.toLowerCase().includes('5s')).length;
+  const countAce = allPhotos.filter(p => p.gameName.toLowerCase().includes('ace')).length;
 
   return (
     <div className="flex flex-col w-full pb-28 px-4 pt-1 max-w-md mx-auto select-none">
@@ -149,8 +149,52 @@ export const GameNightGalleryScreen: React.FC = () => {
         </button>
       </div>
 
-      {/* Grouped Session Gallery Sections */}
-      <div className="flex flex-col gap-6">
+      {/* Empty State when no photos exist (Priority 4) */}
+      {totalSnapsCount === 0 ? (
+        <div className="rounded-3xl bg-[var(--bg-card)] border border-[var(--border-card)] p-8 text-center flex flex-col items-center gap-4 shadow-sm my-4">
+          <div className="w-16 h-16 rounded-2xl bg-[var(--brand-primary-bg)] text-[var(--brand-primary)] flex items-center justify-center shadow-inner">
+            <span className="material-symbols-outlined text-3xl">photo_camera</span>
+          </div>
+          <div className="flex flex-col gap-1.5 max-w-xs">
+            <h3 className="font-headline font-bold text-lg text-[var(--text-primary)]">
+              No Game Snaps Yet
+            </h3>
+            <p className="font-body text-xs text-[var(--text-secondary)] leading-relaxed">
+              Capture table hands, tea duty ceremonies, and trophy smiles. Your game memories are safely stored in your private vault.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              triggerHaptic('success');
+              openAddPhotoModal();
+            }}
+            className="h-12 px-6 rounded-xl bg-[var(--brand-primary)] text-[var(--brand-on-primary)] font-headline font-bold text-xs uppercase tracking-wide flex items-center gap-2 shadow-md hover:opacity-95 active:scale-95 transition-all cursor-pointer mt-1"
+          >
+            <span className="material-symbols-outlined text-[18px]">add_a_photo</span>
+            <span>+ Add First Game Snap</span>
+          </button>
+        </div>
+      ) : filteredSessions.length === 0 ? (
+        <div className="rounded-3xl bg-[var(--bg-card)] border border-[var(--border-card)] p-6 text-center flex flex-col items-center gap-3 shadow-sm my-4">
+          <span className="material-symbols-outlined text-3xl text-[var(--text-muted)]">filter_alt_off</span>
+          <div className="flex flex-col gap-1">
+            <h4 className="font-headline font-bold text-sm text-[var(--text-primary)]">
+              No Snaps Found For This Filter
+            </h4>
+            <p className="font-body text-xs text-[var(--text-secondary)]">
+              No photos recorded under this game variant.
+            </p>
+          </div>
+          <button
+            onClick={() => setActiveFilter('all')}
+            className="h-9 px-4 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--brand-primary)] font-headline font-bold text-xs cursor-pointer"
+          >
+            Show All Snaps ({totalSnapsCount})
+          </button>
+        </div>
+      ) : (
+        /* Grouped Session Gallery Sections */
+        <div className="flex flex-col gap-6">
         {filteredSessions.map(session => {
           const photos = session.photos || [];
           const dateStr = new Date(session.startedAt).toLocaleDateString(undefined, {
@@ -297,6 +341,7 @@ export const GameNightGalleryScreen: React.FC = () => {
           );
         })}
       </div>
+      )}
 
       {/* "Playing right now?" Bottom Callout Card */}
       <div className="mt-6 rounded-3xl bg-[#1c2028] border border-[#3c4a42]/50 p-4 shadow-xl flex flex-col gap-3">

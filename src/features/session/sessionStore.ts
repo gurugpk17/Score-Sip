@@ -6,7 +6,8 @@ import {
   buildSessionResults,
   calculateRoundScore,
   calculateSessionTotals,
-  updatePlayerStatistics
+  updatePlayerStatistics,
+  validateRound
 } from '../../domain/scoring/engine';
 import { StorageService } from '../../lib/storage/db';
 import { persistenceRepository } from '../../lib/repositories/persistenceRepository';
@@ -28,6 +29,7 @@ interface SessionState {
   activeScoringPlayerId: string | null;
   baseScoreInput: number;
   activeScoreType: 'custom' | 'dick' | 'full';
+  isAdvancingRound: boolean;
 
   // Photo & Gallery state
   selectedGameDetailsId: string | null;
@@ -138,6 +140,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     activeScoringPlayerId: null,
     baseScoreInput: 0,
     activeScoreType: 'custom',
+    isAdvancingRound: false,
 
     selectedGameDetailsId: null,
     activePhotoModal: null,
@@ -470,36 +473,48 @@ export const useSessionStore = create<SessionState>((set, get) => {
       });
     },
 
-    confirmPlayerScore: () => {
+    confirmPlayerScore: async () => {
       const {
         activeSession,
         activeScoringPlayerId,
         baseScoreInput,
         activeScoreType,
         historySessions,
-        user
+        user,
+        isAdvancingRound
       } = get();
 
-      if (!activeSession || !activeScoringPlayerId) return;
+      if (!activeSession || !activeScoringPlayerId || isAdvancingRound) return;
 
       const roundIndex = activeSession.currentRoundNumber - 1;
       const currentRound = activeSession.rounds[roundIndex];
       if (!currentRound) return;
 
+      const isAce = activeSession.gameConfig.variant === 'ace';
+
+      // For ACE, validate position uniqueness before assigning
+      if (isAce) {
+        const claimantEntry = Object.entries(currentRound.scores).find(
+          ([pId, sc]) => pId !== activeScoringPlayerId && sc?.entered && sc.baseScore === baseScoreInput
+        );
+        if (claimantEntry) {
+          const claimant = activeSession.players.find(p => p.id === claimantEntry[0]);
+          get().showToast(`Position already taken by ${claimant?.name || 'another player'}!`);
+          return;
+        }
+      }
+
       const roundMultiplier = currentRound.multiplier || 1;
-      const calculatedRoundScore = calculateRoundScore(
-        baseScoreInput,
-        roundMultiplier,
-        activeScoreType,
-        activeSession.gameConfig.variant
-      );
+      const calculatedRoundScore = isAce
+        ? baseScoreInput
+        : calculateRoundScore(baseScoreInput, roundMultiplier);
 
       const scoreEntry: RoundScore = {
         playerId: activeScoringPlayerId,
         baseScore: baseScoreInput,
         multiplier: roundMultiplier,
         finalScore: calculatedRoundScore,
-        scoreType: activeScoreType,
+        scoreType: isAce ? (baseScoreInput === 0 ? 'dick' : 'custom') : activeScoreType,
         entered: true
       };
 
@@ -509,7 +524,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       };
 
       const allEntered = activeSession.players.every(
-        p => p.id === activeScoringPlayerId || updatedScores[p.id]?.entered
+        p => updatedScores[p.id]?.entered
       );
 
       const updatedRound: GameRound = {
@@ -526,7 +541,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         rounds: updatedRounds
       };
 
-      // Find next player needing score entry
+      // Find next player needing score entry in this round
       const nextPlayer = activeSession.players.find(
         p => p.id !== activeScoringPlayerId && !updatedScores[p.id]?.entered
       );
@@ -537,31 +552,65 @@ export const useSessionStore = create<SessionState>((set, get) => {
 
       StorageService.saveSessions(updatedHistory, user?.id);
 
-      triggerHaptic('success');
-      set({
-        activeSession: updatedSession,
-        historySessions: updatedHistory,
-        activeScoringPlayerId: nextPlayer ? nextPlayer.id : activeScoringPlayerId,
-        baseScoreInput: nextPlayer && updatedScores[nextPlayer.id]
-          ? updatedScores[nextPlayer.id]!.baseScore
-          : 0,
-        activeScoreType: nextPlayer && updatedScores[nextPlayer.id]
-          ? updatedScores[nextPlayer.id]!.scoreType
-          : 'custom'
-      });
-
       // Async write single score to persistence
       persistenceRepository.sessions
-        .saveRoundScore(activeSession.id, activeSession.currentRoundNumber, activeScoringPlayerId, scoreEntry)
+        .saveRoundScore(
+          activeSession.id,
+          activeSession.currentRoundNumber,
+          activeScoringPlayerId,
+          scoreEntry,
+          user?.id,
+          allEntered
+        )
         .catch(err => console.warn('[sessionStore] saveRoundScore cloud warning:', err));
+
+      triggerHaptic('success');
+
+      if (nextPlayer) {
+        // Move focus to next unentered player
+        const existingNextScore = updatedScores[nextPlayer.id];
+        set({
+          activeSession: updatedSession,
+          historySessions: updatedHistory,
+          activeScoringPlayerId: nextPlayer.id,
+          baseScoreInput: existingNextScore ? existingNextScore.baseScore : 0,
+          activeScoreType: existingNextScore ? existingNextScore.scoreType : 'custom'
+        });
+      } else {
+        // All players in current round have entered scores!
+        // Validate the completed round
+        const validation = validateRound(
+          updatedRound,
+          activeSession.players,
+          activeSession.gameConfig.variant
+        );
+
+        if (!validation.isValid) {
+          set({
+            activeSession: updatedSession,
+            historySessions: updatedHistory
+          });
+          get().showToast(validation.error || 'Please correct scores before completing round.');
+          return;
+        }
+
+        set({
+          activeSession: updatedSession,
+          historySessions: updatedHistory
+        });
+
+        // Automatically advance or complete round
+        await get().completeRound();
+      }
     },
 
-    completeRound: () => {
-      const { activeSession, historySessions, user } = get();
-      if (!activeSession) return;
+    completeRound: async () => {
+      const { activeSession, historySessions, user, isAdvancingRound } = get();
+      if (!activeSession || isAdvancingRound) return;
 
       const currentRoundNum = activeSession.currentRoundNumber;
       const currentRound = activeSession.rounds[currentRoundNum - 1];
+      if (!currentRound) return;
 
       // Verify all players entered score
       const unentered = activeSession.players.filter(p => !currentRound?.scores[p.id]?.entered);
@@ -570,39 +619,96 @@ export const useSessionStore = create<SessionState>((set, get) => {
         return;
       }
 
-      triggerHaptic('success');
+      // Validate round before advancing
+      const validation = validateRound(
+        currentRound,
+        activeSession.players,
+        activeSession.gameConfig.variant
+      );
+      if (!validation.isValid) {
+        get().showToast(validation.error || 'Cannot complete round: invalid scores.');
+        return;
+      }
 
-      if (currentRoundNum < activeSession.gameConfig.roundCount) {
-        const nextRoundNum = currentRoundNum + 1;
-        const updatedSession: GameSession = {
-          ...activeSession,
-          currentRoundNumber: nextRoundNum
+      set({ isAdvancingRound: true });
+
+      try {
+        const updatedRounds = [...activeSession.rounds];
+        updatedRounds[currentRoundNum - 1] = {
+          ...currentRound,
+          isCompleted: true
         };
 
-        const updatedHistory = historySessions.map(s =>
-          s.id === updatedSession.id ? updatedSession : s
-        );
+        const totalRounds = activeSession.gameConfig.roundCount;
 
-        StorageService.saveSessions(updatedHistory, user?.id);
+        if (currentRoundNum < totalRounds) {
+          const nextRoundNum = currentRoundNum + 1;
+          const updatedSession: GameSession = {
+            ...activeSession,
+            currentRoundNumber: nextRoundNum,
+            rounds: updatedRounds
+          };
 
-        set({
-          activeSession: updatedSession,
-          historySessions: updatedHistory,
-          activeScoringPlayerId: activeSession.players[0].id,
-          baseScoreInput: 0,
-          activeScoreType: 'custom'
-        });
+          // Save session to persistence (local + supabase if logged in)
+          await persistenceRepository.sessions.saveSession(updatedSession, user?.id);
 
-        get().showToast(`Round ${currentRoundNum} Complete! Starting Round ${nextRoundNum}`);
-      } else {
-        // All rounds finished! Finalize session
-        get().finalizeSession();
+          const updatedHistory = historySessions.map(s =>
+            s.id === updatedSession.id ? updatedSession : s
+          );
+          StorageService.saveSessions(updatedHistory, user?.id);
+
+          triggerHaptic('success');
+          set({
+            activeSession: updatedSession,
+            historySessions: updatedHistory,
+            activeScoringPlayerId: activeSession.players[0].id,
+            baseScoreInput: 0,
+            activeScoreType: 'custom',
+            isAdvancingRound: false
+          });
+
+          get().showToast(`Round ${currentRoundNum} Saved! Starting Round ${nextRoundNum} 🚀`);
+        } else {
+          // Final round finished! Mark round completed and finalize session
+          const updatedSession: GameSession = {
+            ...activeSession,
+            rounds: updatedRounds
+          };
+
+          await persistenceRepository.sessions.saveSession(updatedSession, user?.id);
+
+          const updatedHistory = historySessions.map(s =>
+            s.id === updatedSession.id ? updatedSession : s
+          );
+          StorageService.saveSessions(updatedHistory, user?.id);
+
+          set({
+            activeSession: updatedSession,
+            historySessions: updatedHistory,
+            isAdvancingRound: false
+          });
+
+          await get().finalizeSession();
+        }
+      } catch (err: any) {
+        console.error('[sessionStore] completeRound error:', err);
+        set({ isAdvancingRound: false });
+        get().showToast(`Failed to advance round: ${err.message || 'Storage error'}`);
       }
     },
 
-    finalizeSession: () => {
+    finalizeSession: async () => {
       const { activeSession, historySessions, playerStats, user } = get();
       if (!activeSession) return;
+
+      // Idempotency check: if already finalized or completed, never count statistics twice
+      if (activeSession.isFinalized || activeSession.status === 'completed') {
+        set({
+          currentScreen: 'results',
+          viewingHistoricalSessionId: activeSession.id
+        });
+        return;
+      }
 
       const results: SessionResult[] = buildSessionResults(activeSession);
       const updatedStats = updatePlayerStatistics(playerStats, activeSession, results);
@@ -615,10 +721,19 @@ export const useSessionStore = create<SessionState>((set, get) => {
         results
       };
 
-      StorageService.savePlayerStats(updatedStats, user?.id);
+      // Clear active session pointer so returning home doesn't resume a finished game
+      await persistenceRepository.sessions.setActiveSessionId(null, user?.id);
       StorageService.setActiveSessionId(null, user?.id);
 
-      const updatedHistory = [finalizedSession, ...historySessions.filter(s => s.id !== finalizedSession.id)];
+      // Persist finalized session & player stats
+      await persistenceRepository.sessions.saveSession(finalizedSession, user?.id);
+      await persistenceRepository.stats.savePlayerStats(updatedStats, user?.id);
+      StorageService.savePlayerStats(updatedStats, user?.id);
+
+      const updatedHistory = [
+        finalizedSession,
+        ...historySessions.filter(s => s.id !== finalizedSession.id)
+      ];
       StorageService.saveSessions(updatedHistory, user?.id);
 
       triggerHaptic('success');
